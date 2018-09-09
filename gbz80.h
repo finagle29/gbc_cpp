@@ -27,7 +27,7 @@
 #define SET_C_SUB(a, b) BIT_EQUAL(z80.f, CARRY, b > a)
 #define SET_HC_SUB(a, b) BIT_EQUAL(z80.f, HALF_CARRY, ((a) & 0xF) < ((b) & 0xF))
 
-#define SET_HC_ADD_16(a, b) BIT_EQUAL(z80.f, HALF_CARRY, (((a) & 0xF00) + ((b) & 0xF00)) >> 12)
+#define SET_HC_ADD_16(a, b) BIT_EQUAL(z80.f, HALF_CARRY, (((a) & 0xFFF) + ((b) & 0xFFF)) >> 12)
 #define SET_C_ADD_16(a, b) BIT_EQUAL(z80.f, CARRY, ((unsigned long)(a) + (unsigned long)(b)) > 0xFFFF)
 
 #ifdef DEBUG
