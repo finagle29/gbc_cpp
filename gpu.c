@@ -8,10 +8,11 @@ gpu_type gpu;
 
 static SDL_Window *window, *vram_w, *bg_w;
 static SDL_Renderer *renderer, *vram_r, *bg_r;
+static SDL_Texture* framebuffer;
+static unsigned int *pixels;
 
-extern gbz80_type z80;
+static bool show_tileset, show_bgmap;
 
-void put_pixel32(SDL_Surface *surface, int x, int y, Uint32 pixel);
 
 void dump_vram() {
         FILE *f = fopen("vram_dump.bin", "wb");
@@ -82,9 +83,13 @@ void gpu_step() {
                                         // enter VBlank
                                         gpu.mode = 1;
                                         z80.int_f |= 1;
+
+                                        SDL_UpdateTexture(framebuffer, NULL, pixels, 160 * sizeof(unsigned int));
+                                        SDL_RenderClear(renderer);
+                                        SDL_RenderCopy(renderer, framebuffer, NULL, NULL);
                                         SDL_RenderPresent(renderer);
-                                        showTileSet();
-                                        showBGMap();
+                                        if (show_tileset) showTileSet();
+                                        if (show_bgmap) showBGMap();
                                         // printf("\n");
                                         /* put image data on the window */
                                 } else {
@@ -125,7 +130,7 @@ void renderscan() {
         unsigned char x = gpu.scrollX & 7;
         unsigned char color, i, sprite_num, sprite_flags, tile_x, tile_y;
         unsigned short tile;
-        unsigned char scanline_row[160];
+        unsigned char scanline_row[160], sprite_row[8];
 
 
 
@@ -143,8 +148,10 @@ void renderscan() {
 
                         color = 255 - 255*color/3;
 
-                        SDL_SetRenderDrawColor(renderer, color, color, color, 255);
-                        SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
+                        pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
+
+                        // SDL_SetRenderDrawColor(renderer, color, color, color, 255);
+                        // SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
 
                         x++;
                         if (x == 8) {
@@ -173,12 +180,13 @@ void renderscan() {
                                 pal = gpu.ob_pal0;
                         }
 
-                        if (y <= gpu.line && y <= gpu.line + 8) {
+                        if (y >= gpu.line && y <= gpu.line + 8) {
                                 if (GET_BIT(sprite_flags, 6)) {
                                         tile_y = 7 - (gpu.line - y);
                                 } else {
                                         tile_y = gpu.line - y;
                                 }
+
 
                                 for (tile_x = 0; tile_x < 8; tile_x++) {
                                         if (x + tile_x >= 0 &&
@@ -194,8 +202,10 @@ void renderscan() {
                                                 if (color) {
                                                         color = pal >> (color * 2);
                                                         color = 255 - 255 * color / 3;
-                                                        SDL_SetRenderDrawColor(renderer, color, color, color, 255);
-                                                        SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
+                                                        pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
+
+                                                        // SDL_SetRenderDrawColor(renderer, color, color, color, 255);
+                                                        // SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
                                                 }
                                         }
                                 }
@@ -218,6 +228,7 @@ void renderscan() {
 
                 tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
         }
+
 }
 
 void showBGMap() {
@@ -279,9 +290,12 @@ void showTileSet() {
 }
 
 
-void setup() {
+void setup(bool tileset, bool bgmap) {
         int i, x, y;
         SDL_Point window_size = {160, 144};
+        
+        show_tileset = tileset;
+        show_bgmap = bgmap;
 
         SDL_Init(SDL_INIT_VIDEO);
 
@@ -290,37 +304,34 @@ void setup() {
                         window_size.x, window_size.y,
                         SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN,
                         &window, &renderer);
-
-        SDL_CreateWindowAndRenderer(
-                        17*16, 17*24, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN,
-                        &vram_w, &vram_r);
-        
-        SDL_CreateWindowAndRenderer(
-                        256, 256, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN,
-                        &bg_w, &bg_r);
-
         SDL_GetWindowPosition(window, &x, &y);
-        SDL_SetWindowPosition(vram_w, x-17*16, y);
-        SDL_SetWindowPosition(bg_w, x+160, y);
-
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderClear(renderer);
-
-        SDL_SetRenderDrawColor(vram_r, 255, 253, 208, 255);
-        SDL_RenderClear(vram_r);
-        SDL_RenderPresent(vram_r);
-
-
-        SDL_SetRenderDrawColor(bg_r, 255, 253, 208, 255);
-        SDL_RenderClear(bg_r);
-        SDL_RenderPresent(bg_r);
-        /*
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-
-        for (i = 0; i < window_size.x; i++) {
-                SDL_RenderDrawPoint(renderer, i, i);
-        }*/
         SDL_RenderPresent(renderer);
+        SDL_RenderClear(renderer);
+        framebuffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
+        pixels = (unsigned int *)malloc(sizeof(unsigned int) * 160 * 144);
+
+
+        if (tileset) {
+                SDL_CreateWindowAndRenderer(
+                                17*16, 17*24, SDL_WINDOW_OPENGL |
+                                SDL_WINDOW_SHOWN, &vram_w, &vram_r);
+                SDL_SetWindowPosition(vram_w, x-17*16, y);
+                SDL_SetRenderDrawColor(vram_r, 255, 253, 208, 255);
+                SDL_RenderClear(vram_r);
+                SDL_RenderPresent(vram_r);
+        }
+        
+        if (bgmap) {
+                SDL_CreateWindowAndRenderer(
+                                256, 256, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN,
+                                &bg_w, &bg_r);
+                SDL_SetWindowPosition(bg_w, x+160, y);
+                SDL_SetRenderDrawColor(bg_r, 255, 253, 208, 255);
+                SDL_RenderClear(bg_r);
+                SDL_RenderPresent(bg_r);
+        }
+
 
         for (i = 0; i < 1000; i++) {
                 SDL_Delay(1);
@@ -331,6 +342,7 @@ void setup() {
 
 void cleanup() {
         SDL_DestroyWindow(window);
+        free(pixels);
         SDL_DestroyWindow(vram_w);
         SDL_DestroyWindow(bg_w);
         SDL_DestroyRenderer(renderer);

@@ -126,7 +126,7 @@ void LD_n_nn(unsigned short *n, unsigned short nn);
 void LD_SP_HL(void);
 void LDHL_SP_n(signed char n);
 void LD_nn_SP(unsigned short nn);
-void PUSH_nn(unsigned short *nn);
+void PUSH_nn(const unsigned short *nn);
 void POP_nn(unsigned short *nn);
 
 /* 8-bit ALU */
@@ -144,7 +144,7 @@ void DEC_n(unsigned char *n);
 void DEC_HL(void);
 
 /* 16-bit ALU */
-void ADD_HL_n(unsigned short *n);
+void ADD_HL_n(const unsigned short *n);
 void ADD_SP_n(signed char n);
 void INC_nn(unsigned short *nn);
 void DEC_nn(unsigned short *nn);

@@ -37,7 +37,7 @@ typedef struct {
 
 extern gpu_type gpu;
 
-void setup(void);
+void setup(bool, bool);
 void cleanup(void);
 
 void gpu_step(void);

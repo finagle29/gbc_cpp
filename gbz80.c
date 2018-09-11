@@ -53,7 +53,8 @@ void fetch_dispatch_execute_loop() {
 }
 
 int fetch_dispatch_execute() {
-        // printf("pc: 0x%04X\n", z80.pc);
+
+        int cycles = 0;
 
         if (!z80.halt) {
         op = rb(z80.pc++);
@@ -137,7 +138,7 @@ int fetch_dispatch_execute() {
                                                         n = rb(z80.pc);
                                                         if (n == 0xFE) {
                                                                 // IE jumping in place
-                                                                return 1;
+                                                                return 0;
                                                         }
                                                         z80.pc++;
                                                         JR_n((signed char)n);
@@ -406,6 +407,7 @@ int fetch_dispatch_execute() {
 
         // z80.clock.m += z80.m;
         // z80.clock.t += z80.t;
+        cycles += z80.m;
         update_clock();
         gpu_step();
 
@@ -439,12 +441,13 @@ int fetch_dispatch_execute() {
                 }
                 // z80.clock.m += z80.m;
                 // z80.clock.t += z80.t;
+                cycles += z80.m;
                 update_clock();
         }
 
         if (z80.new_ime) z80.ime = z80.new_ime;
 
-        return 0;
+        return cycles;
 
 }
 
@@ -679,7 +682,7 @@ void LD_nn_SP(unsigned short nn) {
         z80.t = 20;
 }
 
-void PUSH_nn(unsigned short *nn) {
+void PUSH_nn(const unsigned short *nn) {
         PRINT_ASM();
         wb(--z80.sp, (*nn >> 8)  & 0xFF);
         wb(--z80.sp, *nn & 0xFF);
@@ -871,7 +874,7 @@ void DEC_HL() {
 
 
 /* 16-bit ALU */
-void ADD_HL_n(unsigned short *n) {
+void ADD_HL_n(const unsigned short *n) {
         PRINT_ASM();
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_HC_ADD_16(z80.hl, *n);

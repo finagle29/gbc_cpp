@@ -17,11 +17,23 @@ _Noreturn void INThandler(int);
 int main(int argc, char* argv[]) {
 
         char game_name[50];
+        bool tileset, bgmap;
+        int i;
+        unsigned int lastTime = 0, currentTime;
+
+        tileset = false;
+        bgmap = false;
 
         if (argc == 1) {
                 strcpy(game_name, "cpu_instrs.gb");
         } else {
                 strcpy(game_name, argv[1]);
+                for (i = 2; i < argc; i++) {
+                        if (strcmp(argv[i], "-d") != 0) {
+                                tileset = true;
+                                bgmap = true;
+                        }
+                }
         }
 
 
@@ -32,7 +44,7 @@ int main(int argc, char* argv[]) {
         init_z80();
         // init_mmu();
 
-        setup();
+        setup(tileset, bgmap);
 
         signal(SIGINT, INThandler);
         
@@ -49,7 +61,7 @@ int main(int argc, char* argv[]) {
         bool quit = false;
         bool runframe = true;
 
-        while (!getc(stdin)) {};
+        // while (!getc(stdin)) {};
 
 
         SDL_Event event;
@@ -129,7 +141,12 @@ int main(int argc, char* argv[]) {
 
 
                 if (runframe) {
-                       runframe = !frame();
+                        lastTime = SDL_GetTicks();
+                        runframe = !frame();
+                        currentTime = SDL_GetTicks();
+                        lastTime = (0 < (int)(17 + lastTime - currentTime)) ?
+                                (17 + lastTime - currentTime) : 0;
+                        SDL_Delay(lastTime);
                 } else {
                         SDL_Delay(1000);
                 }
@@ -142,17 +159,19 @@ int main(int argc, char* argv[]) {
 
 bool frame() {
         int i = 0;
+        int cycles = 0;
         bool quit = false;
 
         do {
-                quit = fetch_dispatch_execute() ? true : false;
-                i++;
+                cycles = fetch_dispatch_execute();
+                quit = cycles ? false : true;
+                i += cycles;
 
                 if (z80.pc == 0xC280) {
-                        asm("nop");
+                        __asm__("nop");
                 }
                 
-        } while (i < 20000 && !quit);
+        } while (i < 17564 && !quit);
         return quit;
 }
 
