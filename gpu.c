@@ -119,7 +119,7 @@ void gpu_step() {
 
 void renderscan() {
         /* Obtain pixels */
-        unsigned short mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
+        unsigned short mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
         unsigned char lineoffs = gpu.scrollX >> 3;
         unsigned char y = (gpu.line + gpu.scrollY) & 7;
         unsigned char x = gpu.scrollX & 7;
@@ -134,67 +134,89 @@ void renderscan() {
         tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
 
         // if (GPU_BG_SET && tile < 128) tile += 256;
+        if (GPU_BG) {
+                for (i = 0; i < 160; i++) {
+                        color = gpu.bg_pal >> (gpu.tileset[tile][y][x] * 2);
+                        color &= 3;
 
-        for (i = 0; i < 160; i++) {
-                color = gpu.bg_pal >> (gpu.tileset[tile][y][x] * 2);
-                color &= 3;
+                        scanline_row[i] = color;
 
-                scanline_row[i] = color;
+                        color = 255 - 255*color/3;
 
-                color = 255 - 255*color/3;
+                        SDL_SetRenderDrawColor(renderer, color, color, color, 255);
+                        SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
 
-                SDL_SetRenderDrawColor(renderer, color, color, color, 255);
-                SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
-
-                x++;
-                if (x == 8) {
-                        x = 0;
-                        lineoffs = (lineoffs + 1) & 31;
-                        // if (gpu.line % 8 == 0) printf("%03d", tile);
-                        tile = gpu.vram[mapoffs + lineoffs];
-                        // if (GPU_BG_SET && tile < 128) tile += 256;
+                        x++;
+                        if (x == 8) {
+                                x = 0;
+                                lineoffs = (lineoffs + 1) & 31;
+                                // if (gpu.line % 8 == 0) printf("%03d", tile);
+                                tile = gpu.vram[mapoffs + lineoffs];
+                                // if (GPU_BG_SET && tile < 128) tile += 256;
+                        }
                 }
         }
         // if (gpu.line % 8 == 0) printf("\n");
 
-        for (i = 0; i < 40; i++) {
-                y = gpu.oam[4 * i] - 16;
-                x = gpu.oam[4 * i + 1] - 8;
-                sprite_num = gpu.oam[4 * i + 2];
-                sprite_flags = gpu.oam[4 * i + 3];
+        if (GPU_SPR) {
+                for (i = 0; i < 40; i++) {
+                        y = gpu.oam[4 * i] - 16;
+                        x = gpu.oam[4 * i + 1] - 8;
+                        sprite_num = gpu.oam[4 * i + 2];
+                        sprite_flags = gpu.oam[4 * i + 3];
 
-                unsigned char pal;
+                        unsigned char pal;
 
-                if (GET_BIT(sprite_flags, 4)) {
-                        pal = gpu.ob_pal1;
-                } else {
-                        pal = gpu.ob_pal0;
-                }
-
-                if (y <= gpu.line && y <= gpu.line + 8) {
-                        if (GET_BIT(sprite_flags, 6)) {
-                                tile_y = 7 - (gpu.line - y);
+                        if (GET_BIT(sprite_flags, 4)) {
+                                pal = gpu.ob_pal1;
                         } else {
-                                tile_y = gpu.line - y;
+                                pal = gpu.ob_pal0;
                         }
 
-                        for (tile_x = 0; tile_x < 8; tile_x++) {
-                                if (x + tile_x >= 0 && x + tile_x < 160 && (~GET_BIT(sprite_flags, 7) || !scanline_row[x + tile_x])) {
-                                        if (GET_BIT(sprite_flags, 5)) {
-                                                color = gpu.tileset[sprite_num][tile_y][7 - tile_x];
-                                        } else {
-                                                color = gpu.tileset[sprite_num][tile_y][tile_x];
-                                        }
+                        if (y <= gpu.line && y <= gpu.line + 8) {
+                                if (GET_BIT(sprite_flags, 6)) {
+                                        tile_y = 7 - (gpu.line - y);
+                                } else {
+                                        tile_y = gpu.line - y;
+                                }
 
-                                        if (color) {
-                                                color = pal >> (color * 2);
-                                                color = 255 - 255 * color / 3;
-                                                SDL_SetRenderDrawColor(renderer, color, color, color, 255);
-                                                SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
+                                for (tile_x = 0; tile_x < 8; tile_x++) {
+                                        if (x + tile_x >= 0 &&
+                                                        x + tile_x < 160 &&
+                                                        (~GET_BIT(sprite_flags, 7) ||
+                                                         !scanline_row[x + tile_x])) {
+                                                if (GET_BIT(sprite_flags, 5)) {
+                                                        color = gpu.tileset[sprite_num][tile_y][7 - tile_x];
+                                                } else {
+                                                        color = gpu.tileset[sprite_num][tile_y][tile_x];
+                                                }
+
+                                                if (color) {
+                                                        color = pal >> (color * 2);
+                                                        color = 255 - 255 * color / 3;
+                                                        SDL_SetRenderDrawColor(renderer, color, color, color, 255);
+                                                        SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
+                                                }
                                         }
                                 }
                         }
                 }
+        }
+
+        if (GPU_WDOW) {
+                unsigned short mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
+                unsigned char lineoffs = (gpu.wdow_x - 7) >> 3;
+                unsigned char y = (gpu.line + gpu.wdow_y) & 7;
+                unsigned char x = gpu.wdow_x & 7;
+                unsigned char color, i, sprite_num, sprite_flags, tile_x, tile_y;
+                unsigned short tile;
+                unsigned char scanline_row[160];
+
+
+
+                mapoffs += (((gpu.line - gpu.wdow_y) & 0xFF) >> 3) << 5;
+
+                tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
         }
 }
 
@@ -215,6 +237,20 @@ void showBGMap() {
                         }
                 }
         }
+
+        SDL_Rect screen1 = {gpu.scrollX, gpu.scrollY, 160, 144};
+        SDL_Rect screen2 = {gpu.scrollX, gpu.scrollY, 160, 144};
+        SDL_Rect screen3 = {gpu.scrollX, gpu.scrollY, 160, 144};
+        SDL_Rect screen4 = {gpu.scrollX, gpu.scrollY, 160, 144};
+        
+        if (screen1.x + screen1.w > 256) screen2.x -= 256;
+        if (screen1.y + screen1.h > 256) screen3.y -= 256;
+        if (screen1.x + screen1.w > 256 && screen1.y + screen1.h > 256) screen4.x -= 256; screen4.y -= 256;
+        SDL_SetRenderDrawColor(bg_r, 255, 0, 0, 255);
+        SDL_RenderDrawRect(bg_r, &screen1);
+        SDL_RenderDrawRect(bg_r, &screen2);
+        SDL_RenderDrawRect(bg_r, &screen3);
+        SDL_RenderDrawRect(bg_r, &screen4);
         SDL_RenderPresent(bg_r);
 }
 

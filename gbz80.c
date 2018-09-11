@@ -830,11 +830,13 @@ void INC_HL() {
         unsigned char tmp = rb(z80.hl);
         PRINT_ASM(tmp);
 
-        wb(z80.hl, tmp + 1);
+        SET_HC_ADD(tmp, 1);
+        tmp += 1;
+
+        wb(z80.hl, tmp);
         
         BIT_CLEAR(z80.f, SUBTRACT);
-        SET_HC_ADD(tmp, 1);
-        SET_Z_RES(tmp + 1);
+        SET_Z_RES(tmp);
 
         z80.m = 3;
         z80.t = 12;
@@ -968,7 +970,7 @@ void DAA() {
                 }
         }
 
-        z80.a = (unsigned char)s;
+        z80.a = (unsigned char)(s & 0xFF);
         SET_Z_RES(z80.a);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
@@ -992,7 +994,7 @@ void CCF() {
         PRINT_ASM();
         BIT_FLIP(z80.f, CARRY);
         BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, SUBTRACT);
+        BIT_CLEAR(z80.f, HALF_CARRY);
 
         z80.m = 1;
         z80.t = 4;
@@ -1002,7 +1004,7 @@ void SCF() {
         PRINT_ASM();
         BIT_SET(z80.f, CARRY);
         BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, SUBTRACT);
+        BIT_CLEAR(z80.f, HALF_CARRY);
 
         z80.m = 1;
         z80.t = 4;
@@ -1151,7 +1153,7 @@ void RL_HL() {
         unsigned char val = rb(z80.hl);
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
-        val = (unsigned char)((val << 1) | old_carry);
+        val = (unsigned char)((0xFF & (val << 1)) | old_carry);
         wb(z80.hl, val);
 
         SET_Z_RES(val);
@@ -1209,7 +1211,7 @@ void RR_HL() {
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
         unsigned char val = rb(z80.hl);
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
+        BIT_EQUAL(z80.f, CARRY, val&1);
         val = (unsigned char)((val >> 1) | (old_carry << 7));
         wb(z80.hl, val);
 
@@ -1315,7 +1317,6 @@ void SRL_HL() {
 void BIT_b_r(unsigned char b, unsigned char r) {
         PRINT_ASM_CB(b);
         BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
-        // if (BIT_CHECK(r, b)) BIT_SET(z80.f, ZERO);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_SET(z80.f, HALF_CARRY);
 
@@ -1326,12 +1327,12 @@ void BIT_b_r(unsigned char b, unsigned char r) {
 void BIT_b_HL(unsigned char b) {
         PRINT_ASM_CB(b);
         unsigned char r = rb(z80.hl);
-        if (BIT_CHECK(r, b)) BIT_SET(z80.f, ZERO);
+        BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_SET(z80.f, HALF_CARRY);
 
-        z80.m = 4;
-        z80.t = 16;
+        z80.m = 3;
+        z80.t = 12;
 }
 
 void SET_b_r(unsigned char b, unsigned char *r) {
@@ -1449,8 +1450,8 @@ void RST_n(unsigned char n) {
         ww(z80.sp, z80.pc);
         z80.pc = n;
 
-        z80.m = 8;
-        z80.t = 32;
+        z80.m = 4;
+        z80.t = 16;
 }
 
 void RST40() {
