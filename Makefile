@@ -4,6 +4,9 @@ CCFLAGS = -Weverything
 debug:	CCFLAGS += -g -O0 -DDEBUG
 debug:	test
 
+quiet:	CCFLAGS += -g -O0
+quiet: test
+
 release:	CCFLAGS += -O2
 release: test
 
@@ -25,6 +28,7 @@ main.o: main.c gpu.h gpu.c mmu.c mmu.h gbz80.c gbz80.h
 
 test: main.o gpu.o gbz80.o mmu.o
 	$(CC) $(SDLFLAGS) main.o gbz80.o mmu.o gpu.o $(SDL2) -o test
+	dsymutil test
 
 clean:
 	rm -rf *.o test
