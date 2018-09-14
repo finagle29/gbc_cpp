@@ -23,6 +23,7 @@ void print_n_bytes(unsigned short n) {
 }
 
 void load_rom(char* fname) {
+        unsigned char cart_type;
 
         FILE *f = fopen(fname, "rb");
         // unsigned char rom_size;
@@ -30,9 +31,27 @@ void load_rom(char* fname) {
 
         fseek(f, 0, SEEK_END);
         rom_size = (unsigned long)ftell(f);
+        mmu = (mmu_type *)malloc(sizeof(mmu_type) + rom_size);
+        
+        fseek(f, 0x147, SEEK_SET);
+        switch (cart_type = fgetc(f))
+        {
+                case 0x00: case 0x01: case 0x02: case 0x03:
+                case 0x08: case 0x09:
+                        mmu->mbc = 1;
+                        break;
+                case 0x05: case 0x06:
+                        mmu->mbc = 2;
+                        break;
+                case 0x0F: case 0x10: case 0x11: case 0x12: case 0x13:
+                        mmu->mbc = 3;
+                        break;
+                default:
+                        mmu->mbc = 1;
+        }
+
         rewind(f);
 
-        mmu = (mmu_type *)malloc(sizeof(mmu_type) + rom_size);
         mmu->mode = 0;
         
 /*
@@ -209,13 +228,17 @@ void wb(unsigned short addr, unsigned char val) {
                         break;
                 case 0x2000:
                 case 0x3000:
-                        mmu->rom_bank = (mmu->rom_bank & ~0x1F) | ((val ? val : val + 1) & 0x1F);
+                        if (mmu->mbc == 1) {
+                                mmu->rom_bank = (mmu->rom_bank & ~0x1F) | ((val ? val : val + 1) & 0x1F);
+                        } else if (mmu->mbc == 3) {
+                                mmu->rom_bank = val & 0x7F;
+                        }
                         break;
 
                 /* ROM1 (unbanked) (16k) */
                 case 0x4000:
                 case 0x5000:
-                        if (!mmu->mode) {
+                        if (mmu->mode) {
                                 mmu->ram_bank = val & 0x3;
                         } else {
                                 mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 0x3) << 5));
@@ -224,6 +247,11 @@ void wb(unsigned short addr, unsigned char val) {
                 case 0x6000:
                 case 0x7000:
                         mmu->mode = val & 1; // MBC 1
+                        if (mmu->mode) {
+                                mmu->rom_bank &= 0x1F;
+                        } else {
+                                mmu->ram_bank = 0;
+                        }
                         break;
 
                 /* Graphics: VRAM (8k) */

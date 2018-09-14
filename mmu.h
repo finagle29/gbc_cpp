@@ -20,7 +20,7 @@ typedef struct {
         bool inbios;
 
         unsigned char rom_bank, ram_bank;
-        unsigned char mode;
+        unsigned char mode, mbc;
 
         unsigned char bios[0x100];
         unsigned char vram[0x2000];
