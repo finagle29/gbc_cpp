@@ -28,8 +28,9 @@ int main(int argc, char* argv[]) {
                 strcpy(game_name, "cpu_instrs.gb");
         } else {
                 strcpy(game_name, argv[1]);
-                for (i = 2; i < argc; i++) {
-                        if (strcmp(argv[i], "-d") != 0) {
+                for (i = 1; i < argc; i++) {
+                        if (strcmp(argv[i], "-d") == 0) {
+                                printf("%s\t%d\n", argv[i], strcmp(argv[i], "-d"));
                                 tileset = true;
                                 bgmap = true;
                         }
@@ -45,6 +46,7 @@ int main(int argc, char* argv[]) {
         // init_mmu();
 
         setup(tileset, bgmap);
+        atexit(SDL_Quit);
 
         signal(SIGINT, INThandler);
         
@@ -180,10 +182,17 @@ void INThandler(int sig) {
         printf("\tz80.de: 0x%04X\tz80.hl: 0x%04X\n", z80.de, z80.hl);
         printf("\tz80.if: 0x%02X\tz80.ie: 0x%02X\n", z80.int_f, z80.int_en);
         printf("\tz80.ime: %d\n", z80.ime);
+        printf("\n\n");
+        printf("LCDC: 0x%02X\tSTAT: 0x%02X\n", gpu.gpu_ctrl, gpu.gpu_stat);
 
         FILE *f = fopen("hram_dump.bin", "wb");
         fwrite(mmu->zram, 1, 0x80, f);
         fclose(f);
+
+        f = fopen("oam_dump.bin", "wb");
+        fwrite(gpu.oam, 1, 0xA0, f);
+        fclose(f);
+        cleanup();
 
         exit(0);
 }
