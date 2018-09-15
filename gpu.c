@@ -14,10 +14,17 @@ static SDL_Renderer *renderer, *vram_r, *bg_r;
 static bool show_tileset, show_bgmap;
 
 static unsigned char dmg_pal[4][3] = {
-        {155, 188, 15},
-        {139, 172, 15},
+        {156, 189, 15},
+        {140, 173, 15},
         {48, 98, 48},
         {15, 56, 15}
+};
+
+static unsigned char bgb_pal[4][3] = {
+        {224, 248, 208},
+        {136, 192, 112},
+        {52, 104, 86},
+        {8, 24, 32}
 };
 
 static unsigned char bw_pal[4][3] = {
@@ -27,11 +34,15 @@ static unsigned char bw_pal[4][3] = {
         {0, 0, 0}
 };
 
-#define DMG
+#define BGB
 
 #ifdef DMG
 #define PAL dmg_pal
-#else
+#endif
+#ifdef BGB
+#define PAL bgb_pal
+#endif
+#ifndef PAL
 #define PAL bw_pal
 #endif
 
@@ -115,6 +126,7 @@ void gpu_step() {
                                         // SDL_UpdateTexture(framebuffer, NULL, pixels, 160 * sizeof(unsigned int));
                                         // SDL_RenderClear(renderer);
                                         // SDL_RenderCopy(renderer, framebuffer, NULL, NULL);
+                                        renderscan();
                                         SDL_RenderPresent(renderer);
                                         if (show_tileset) showTileSet();
                                         if (show_bgmap) showBGMap();
@@ -158,7 +170,7 @@ void renderscan() {
         unsigned char x = gpu.scrollX & 7;
         unsigned char color, i, sprite_num, sprite_flags, tile_x, tile_y, sprite_size;
         unsigned short tile;
-        unsigned char scanline_row[160], sprite_row[8];
+        unsigned char scanline_row[160];
 
 
 
@@ -178,7 +190,7 @@ void renderscan() {
                         // pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
 
                         SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                        SDL_RenderDrawPoint(renderer, i, gpu.line + 1);
+                        SDL_RenderDrawPoint(renderer, i, gpu.line);
 
                         x++;
                         if (x == 8) {
@@ -236,30 +248,50 @@ void renderscan() {
                                                         // pixels[x+tile_x + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
 
                                                         SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                                                        SDL_RenderDrawPoint(renderer, x+tile_x, gpu.line + 1);
+                                                        SDL_RenderDrawPoint(renderer, x+tile_x, gpu.line);
                                                 }
                                         }
                                 }
                         }
                 }
         }
-
+/*
         if (GPU_WDOW) {
-                unsigned short mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
-                unsigned char lineoffs = (gpu.wdow_x - 7) >> 3;
-                unsigned char y = (gpu.line + gpu.wdow_y) & 7;
-                unsigned char x = gpu.wdow_x & 7;
-                unsigned char color, i, sprite_num, sprite_flags, tile_x, tile_y;
-                unsigned short tile;
-                unsigned char scanline_row[160];
-
-
+                mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
+                lineoffs = (gpu.wdow_x - 7) >> 3;
+                y = (gpu.line + gpu.wdow_y) & 7;
+                x = gpu.wdow_x & 7;
 
                 mapoffs += (((gpu.line - gpu.wdow_y) & 0xFF) >> 3) << 5;
 
                 tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
-        }
 
+                if (!GPU_BG_SET && tile < 128) tile += 256;
+                if (gpu.wdow_y >= gpu.line) {
+                for (i = gpu.wdow_x; i < 160; i++) {
+                        color = gpu.bg_pal >> (gpu.tileset[tile][y][x] * 2);
+                        color &= 3;
+
+
+                        // color = 255 - 255*color/3;
+
+                        // pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
+
+                        SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
+                        SDL_RenderDrawPoint(renderer, i, gpu.line);
+
+                        x++;
+                        if (x == 8) {
+                                x = 0;
+                                lineoffs = (lineoffs + 1) & 31;
+                                // if (gpu.line % 8 == 0) printf("%03d", tile);
+                                tile = gpu.vram[mapoffs + lineoffs];
+                                if (!GPU_BG_SET && tile < 128) tile += 256;
+                        }
+                }
+                }
+        }
+*/
 }
 
 void showBGMap() {
