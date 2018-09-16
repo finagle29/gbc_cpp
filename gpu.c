@@ -203,6 +203,42 @@ void renderscan() {
                 }
         }
         // if (gpu.line % 8 == 0) printf("\n");
+        if (GPU_WDOW) {
+                mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
+                lineoffs = 0;
+                y = (gpu.line + gpu.wdow_y) & 7;
+                x = 0;
+
+                mapoffs += (((gpu.line - gpu.wdow_y) & 0xFF) >> 3) << 5;
+
+                tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
+
+                if (!GPU_BG_SET && tile < 128) tile += 256;
+                if (gpu.wdow_y <= gpu.line) {
+                        for (i = gpu.wdow_x - 7; i < 160; i++) {
+                                color = gpu.bg_pal >> (gpu.tileset[tile][y][x] * 2);
+                                color &= 3;
+
+                                scanline_row[i] = gpu.tileset[tile][y][x];
+
+                                // color = 255 - 255*color/3;
+
+                                // pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
+
+                                SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
+                                SDL_RenderDrawPoint(renderer, i, gpu.line);
+
+                                x++;
+                                if (x == 8) {
+                                        x = 0;
+                                        lineoffs = (lineoffs + 1) & 31;
+                                        // if (gpu.line % 8 == 0) printf("%03d", tile);
+                                        tile = gpu.vram[mapoffs + lineoffs];
+                                        if (!GPU_BG_SET && tile < 128) tile += 256;
+                                }
+                        }
+                }
+        }
 
         if (GPU_SPR) {
                 sprite_size = 1 + GPU_SP_SZ;
@@ -255,43 +291,8 @@ void renderscan() {
                         }
                 }
         }
-/*
-        if (GPU_WDOW) {
-                mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
-                lineoffs = (gpu.wdow_x - 7) >> 3;
-                y = (gpu.line + gpu.wdow_y) & 7;
-                x = gpu.wdow_x & 7;
-
-                mapoffs += (((gpu.line - gpu.wdow_y) & 0xFF) >> 3) << 5;
-
-                tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
-
-                if (!GPU_BG_SET && tile < 128) tile += 256;
-                if (gpu.wdow_y >= gpu.line) {
-                for (i = gpu.wdow_x; i < 160; i++) {
-                        color = gpu.bg_pal >> (gpu.tileset[tile][y][x] * 2);
-                        color &= 3;
 
 
-                        // color = 255 - 255*color/3;
-
-                        // pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
-
-                        SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                        SDL_RenderDrawPoint(renderer, i, gpu.line);
-
-                        x++;
-                        if (x == 8) {
-                                x = 0;
-                                lineoffs = (lineoffs + 1) & 31;
-                                // if (gpu.line % 8 == 0) printf("%03d", tile);
-                                tile = gpu.vram[mapoffs + lineoffs];
-                                if (!GPU_BG_SET && tile < 128) tile += 256;
-                        }
-                }
-                }
-        }
-*/
 }
 
 void showBGMap() {
@@ -364,12 +365,13 @@ void setup(bool tileset, bool bgmap) {
         show_tileset = tileset;
         show_bgmap = bgmap;
 
+
         SDL_Init(SDL_INIT_VIDEO);
 
-
         SDL_CreateWindowAndRenderer(
-                        window_size.x, window_size.y,
-                        0, &window, &renderer);
+                        window_size.x*2, window_size.y*2,
+                        SDL_WINDOW_OPENGL, &window, &renderer);
+        SDL_RenderSetLogicalSize(renderer, 160, 144);
         SDL_GetWindowPosition(window, &x, &y);
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
