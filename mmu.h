@@ -6,8 +6,9 @@
 #include <stdbool.h>
 
 void init_mmu(void);
-void load(char *f, unsigned short addr);
+void load_bios(char *f);
 void print_n_bytes(unsigned short n);
+void save_sram(void);
 void load_rom(char *f);
 
 unsigned char rb(unsigned short addr);
@@ -17,7 +18,7 @@ void wb(unsigned short addr, unsigned char val);
 void ww(unsigned short addr, unsigned short val);
 
 typedef struct {
-        bool inbios;
+        bool inbios, eram_enable;
 
         unsigned char rom_bank, ram_bank;
         unsigned char mode, mbc;

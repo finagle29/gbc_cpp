@@ -47,12 +47,13 @@ void update_clock(void);
 void check_timer(void);
 
 typedef struct {
+        unsigned short m; // 2 bytes
         unsigned char main, sub; // 2 bytes
         unsigned char div, div_c, tima, tma, tac, old_tac; // 6 bytes
-} clock_type; // 8 bytes
+} clock_type; // 10 bytes, aligned to 2
 
 typedef struct {
-        clock_type clock; // 8 bytes
+        clock_type clock; // 10 bytes aligned to 2
         struct {
                 union {
                         struct {

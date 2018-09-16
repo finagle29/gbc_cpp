@@ -1,7 +1,9 @@
 #include "gbz80.h"
 #include "mmu.h"
+#include "apu.h"
 #include "gpu.h"
 #include "keys.h"
+#include "gb_apu/MB_Wrapper.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <SDL2/SDL.h>
@@ -13,6 +15,12 @@ bool frame(void);
 key_type key;
 
 _Noreturn void INThandler(int);
+
+Multi_Buffer* buf; // Stereo_Buffer
+const int out_size = 4096;
+blip_sample_t out_buf[out_size];
+
+SDL_AudioDeviceID dev;
 
 int main(int argc, char* argv[]) {
 
@@ -45,8 +53,32 @@ int main(int argc, char* argv[]) {
         init_z80();
         // init_mmu();
 
+        SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+        init_apu();
         setup(tileset, bgmap);
         atexit(SDL_Quit);
+
+        buf = new_Stereo_Buffer();
+        blargg_err_t error = Multi_Buffer_set_sample_rate(buf, 44100);
+        if (error)
+                fprintf(stderr, "%s", error);
+        Multi_Buffer_clock_rate(buf, 4194304);
+
+        Gb_Apu_output_3(apu, Stereo_Buffer_center(buf),
+                        Stereo_Buffer_left(buf),
+                        Stereo_Buffer_right(buf));
+
+        SDL_AudioSpec want, have;
+        SDL_zero(want);
+        want.freq = 44100;
+        want.format = AUDIO_S16SYS;
+        want.channels = 2;
+        want.samples = 2048;
+
+        dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+
+        SDL_PauseAudioDevice(dev, 0);
+
 
         signal(SIGINT, INThandler);
         
@@ -55,7 +87,7 @@ int main(int argc, char* argv[]) {
         mmu->inbios = true;
         
         //load("DMG_ROM_friendly.bin", 0x0);
-        load("DMG_ROM.bin", 0x0);
+        load_bios("DMG_ROM.bin");
         
         // scramble_z80();
         mmu->inbios = true;
@@ -163,19 +195,34 @@ bool frame() {
         int i = 0;
         int cycles = 0;
         bool quit = false;
+        bool stereo;
+        size_t count;
 
         do {
                 cycles = fetch_dispatch_execute();
                 quit = cycles ? false : true;
                 i += cycles;
 
+
+
                 if (z80.pc == 0xC280) {
                         __asm__("nop");
                 }
                 
         } while (i < 17564 && !quit);
+        z80.clock.m = 0;
+
+        stereo = Gb_Apu_end_frame(apu, i*4);
+        Multi_Buffer_end_frame(buf, i*4, stereo);
+        if (Multi_Buffer_samples_avail(buf) >= out_size) {
+                count = Multi_Buffer_read_samples(buf, out_buf, out_size);
+                SDL_QueueAudio(dev, out_buf, count);
+        }
+
         return quit;
 }
+
+
 
 void INThandler(int sig) {
         printf("At 0x%04X,\n\tz80.af: 0x%04X\tz80.bc: 0x%04X\n", z80.pc, z80.af, z80.bc);

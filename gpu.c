@@ -366,8 +366,6 @@ void setup(bool tileset, bool bgmap) {
         show_bgmap = bgmap;
 
 
-        SDL_Init(SDL_INIT_VIDEO);
-
         SDL_CreateWindowAndRenderer(
                         window_size.x*2, window_size.y*2,
                         SDL_WINDOW_OPENGL, &window, &renderer);

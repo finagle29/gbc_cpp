@@ -1,9 +1,10 @@
-#ifndef __GBAPU_WRAPPER_H
+#ifndef GBAPU_WRAPPER_H
+#define GBAPU_WRAPPER_H
 
 typedef long     gb_time_t; // clock cycle count
 typedef unsigned gb_addr_t; // 16-bit address
 
-#include "Gb_Oscs.h"
+#include "BB_Wrapper.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,10 +13,10 @@ extern "C" {
 
 typedef struct Gb_Apu Gb_Apu;
 
-Gb_Apu* new_Gb_Apu();
+Gb_Apu* new_Gb_Apu(void);
 void delete_Gb_Apu(Gb_Apu* g);
 void Gb_Apu_volume(Gb_Apu* g, double vol);
-void Gb_Apu_treble_eq(Gb_Apu* g, const blip_eq_t& eq);
+void Gb_Apu_treble_eq(Gb_Apu* g, const blip_eq_t* eq);
 void Gb_Apu_reset(Gb_Apu* g);
 void Gb_Apu_output_1(Gb_Apu* g, Blip_Buffer* mono);
 void Gb_Apu_output_3(Gb_Apu* g, Blip_Buffer* center, Blip_Buffer* left,

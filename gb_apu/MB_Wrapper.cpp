@@ -13,16 +13,25 @@ extern "C" {
                 delete mb;
         }
 
-        blargg_err_t Multi_Buffer_set_channel_count(Multi_Buffer* mb, int x) {
+        blargg_err_t Multi_Buffer_set_channel_count(Multi_Buffer* mb,
+                        int x) {
                 return mb->set_channel_count(x);
         }
 
-        channel_t Multi_Buffer_channel(Multi_Buffer* mb, int index) {
-                Multi_Buffer::channel_t channel = mb->channel(index);
-                return *reinterpret_cast<channel_t *>(&channel);
+
+        Blip_Buffer* Stereo_Buffer_center(Multi_Buffer* mb) {
+                return reinterpret_cast<Stereo_Buffer* >(mb)->center();
+        }
+        Blip_Buffer* Stereo_Buffer_left(Multi_Buffer* mb) {
+                return reinterpret_cast<Stereo_Buffer* >(mb)->left();
+        }
+        Blip_Buffer* Stereo_Buffer_right(Multi_Buffer* mb) {
+                return reinterpret_cast<Stereo_Buffer* >(mb)->right();
         }
 
-        blargg_err_t Multi_Buffer_set_sample_rate(Multi_Buffer *mb, long rate) {
+
+        blargg_err_t Multi_Buffer_set_sample_rate(Multi_Buffer *mb,
+                        long rate) {
                 return mb->set_sample_rate(rate);
         }
         blargg_err_t Multi_Buffer_set_sample_rate_msec(Multi_Buffer *mb,
@@ -59,12 +68,13 @@ extern "C" {
                 return mb->samples_per_frame();
         }
 
-        unsigned int Multi_Buffer_channels_changed_count(Multi_Buffer* mb) {
+        unsigned int Multi_Buffer_channels_changed_count(
+                        Multi_Buffer* mb) {
                 return mb->channels_changed_count();
         }
 
-        long Multi_Buffer_read_samples(Multi_Buffer* mb, blip_sample_t* out,
-                        long count) {
+        long Multi_Buffer_read_samples(Multi_Buffer* mb,
+                        blip_sample_t* out, long count) {
                 return mb->read_samples(out, count);
         }
 

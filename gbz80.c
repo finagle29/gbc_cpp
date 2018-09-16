@@ -405,7 +405,7 @@ int fetch_dispatch_execute() {
 
         /* do other things i guess */
 
-        // z80.clock.m += z80.m;
+        z80.clock.m += z80.m;
         // z80.clock.t += z80.t;
         cycles += z80.m;
         update_clock();
@@ -439,7 +439,7 @@ int fetch_dispatch_execute() {
                         RST60();
                         // handle keypad interaction
                 }
-                // z80.clock.m += z80.m;
+                z80.clock.m += z80.m;
                 // z80.clock.t += z80.t;
                 cycles += z80.m;
                 update_clock();

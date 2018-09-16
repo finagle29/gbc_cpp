@@ -58,6 +58,12 @@
 
 #endif
 
+#ifdef BLARGG_COMPILER_HAS_NAMESPACE
+        #ifndef __cplusplus
+                #undef BLARGG_COMPILER_HAS_NAMESPACE
+        #endif
+#endif
+
 // STATIC_CAST(T) (expr) -> static_cast< T > (expr)
 #ifndef STATIC_CAST
 	#define STATIC_CAST( type ) static_cast< type >
@@ -135,7 +141,7 @@
 
 // blargg_err_t (NULL on success, otherwise error string)
 typedef const char* blargg_err_t;
-const blargg_err_t blargg_success = 0;
+static const blargg_err_t blargg_success = 0;
 
 // BLARGG_NEW is used in place of 'new' to create objects. By default,
 // plain new is used.

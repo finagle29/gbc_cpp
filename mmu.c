@@ -1,11 +1,19 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include "gbz80.h"
 #include "mmu.h"
 #include "gpu.h"
 #include "keys.h"
+#include "apu.h"
+#include "gb_apu/GBAPU_Wrapper.h"
+
 
 mmu_type *mmu = NULL;
+
+static char *file_name_base;
+
 
 void init_mmu() {
 
@@ -22,7 +30,24 @@ void print_n_bytes(unsigned short n) {
         }
 }
 
+void save_sram() {
+        char *sav_fname = strcat(file_name_base, ".sav");
+        FILE *f = fopen(sav_fname, "wb");
+        fwrite(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
+        fclose(f);
+}
+
+void load_bios(char* fname) {
+        FILE *f = fopen(fname, "rb");
+        fread(mmu->bios, sizeof(unsigned char), 0x100, f);
+        fclose(f);
+}
+
 void load_rom(char* fname) {
+        char fname_copy[50];
+        char sav_name[50];
+        strcpy(fname_copy, fname);
+        file_name_base = strtok(fname_copy, ".");
         unsigned char cart_type;
 
         FILE *f = fopen(fname, "rb");
@@ -54,28 +79,6 @@ void load_rom(char* fname) {
 
         mmu->mode = 0;
         
-/*
-        fseek(f, 0x148, SEEK_SET);
-        switch (rom_size = fgetc(f))
-        {
-                case 0x52:
-                        mmu->type *mmu->= (mmu->type *)malloc(sizeof(mmu->type) + 0x900000 * sizeof(unsigned char));
-                        break;
-                case 0x53:
-                        mmu->type *mmu->= (mmu->type *)malloc(sizeof(mmu->type) + 0xA00000 * sizeof(unsigned char));
-                        break;
-                case 0x54:
-                        mmu->type *mmu->= (mmu->type *)malloc(sizeof(mmu->type) + 0xC00000 * sizeof(unsigned char));
-                        break;
-                default:
-                        rom_size = 0;
-                case 0x00: case 0x01: case 0x02: case 0x03:
-                case 0x04: case 0x05: case 0x06: case 0x07:
-                case 0x08:
-                        mmu->type *mmu->= (mmu->type *)malloc(sizeof(mmu->type) + 0x8000 << rom_size);
-                        break;
-        }
-*/
         if (mmu == NULL) {
                 fprintf(stderr, "Error using malloc for mmu.");
                 fclose(f);
@@ -86,6 +89,15 @@ void load_rom(char* fname) {
         fseek(f, 0, SEEK_SET);
 
         fread(mmu->rom, sizeof(unsigned char), rom_size, f);
+        fclose(f);
+
+        char *sav_fname = strcat(file_name_base, ".sav");
+        struct stat buffer;
+        if (stat(sav_fname, &buffer) == 0) {
+                f = fopen(sav_fname, "rb");
+                fread(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
+                fclose(f);
+        }
 
         mmu->rom_bank = 1;
 }
@@ -119,7 +131,9 @@ unsigned char rb(unsigned short addr) {
                 /* External RAM (8k) */
                 case 0xA000:
                 case 0xB000:
-                        return mmu->eram[mmu->ram_bank * 0x2000 + (addr & 0x1FFF)];
+                        if (mmu->eram_enable)
+                                return mmu->eram[mmu->ram_bank * 0x2000 + (addr & 0x1FFF)];
+                        return 0xFF;
 
                 /* Working RAM (8k) */
                 case 0xC000:
@@ -149,6 +163,11 @@ unsigned char rb(unsigned short addr) {
                                 case 0xF00:
                                         if (addr >= 0xFF80) {
                                                 return mmu->zram[addr & 0x7F];
+                                        } else if (addr >= Gb_Apu_start_addr &&
+                                                       addr <= Gb_Apu_end_addr) {
+                                                return Gb_Apu_read_register(apu,
+                                                                z80.clock.m,
+                                                                addr);
                                         } else {
                                         switch (addr) {
                                         case 0xFF00:
@@ -213,18 +232,13 @@ void wb(unsigned short addr, unsigned char val) {
         switch (addr & 0xF000) {
                 /* BIOS (256b) or ROM0 */
                 case 0x0000:
-                        if (mmu->inbios) {
-                                if (addr < 0x0100) {
-                                        mmu->bios[addr] = val;
-                                } else if (z80_p->pc == 0x0100) {
-                                        mmu->inbios = false;
-                                }
-                        } else {
-                                // mmu->rom[addr] = val;
-                        }
-                        break;
                 case 0x1000:
-                        // mmu->rom[addr] = val; // shouldn't be allowed
+                        if (mmu->mbc & 1) {
+                                mmu->eram_enable = ((val & 0x0F) == 0x0A);
+                                if (!mmu->eram_enable) {
+                                        save_sram();
+                                }
+                        }
                         break;
                 case 0x2000:
                 case 0x3000:
@@ -232,6 +246,8 @@ void wb(unsigned short addr, unsigned char val) {
                                 mmu->rom_bank = (mmu->rom_bank & ~0x1F) | ((val ? val : val + 1) & 0x1F);
                         } else if (mmu->mbc == 3) {
                                 mmu->rom_bank = val & 0x7F;
+                        } else if (mmu->mbc == 2 && (addr & 0x100)) {
+                                mmu->rom_bank = val & 0x0F;
                         }
                         break;
 
@@ -313,6 +329,12 @@ void wb(unsigned short addr, unsigned char val) {
                                         } else {
                                                 mmu->io[addr & 0x7F] = val;
                                         }
+                                        if (addr >= Gb_Apu_start_addr &&
+                                                        addr <= Gb_Apu_end_addr) {
+                                                Gb_Apu_write_register(apu,
+                                                                z80.clock.m,
+                                                                addr, val);
+                                        }
                                         switch (addr) {
                                         case 0xFF00:
                                                 key.column = ((val & 0x30) >> 4);
@@ -389,20 +411,3 @@ void wb(unsigned short addr, unsigned char val) {
         }
 }
 
-void load(char* filename, unsigned short addr) {
-        FILE *f;
-        int c;
-
-        f = fopen(filename, "rb");
-
-        if (f == NULL) {
-                fprintf(stderr, "file %s does not exist!", filename);
-                exit(1);
-        }
-
-        while ((c = fgetc(f)) != EOF) {
-                wb(addr++, (unsigned char)c);
-        }
-
-        fclose(f);
-}
