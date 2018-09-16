@@ -1,2 +1,6 @@
 .DS_STORE
 *.gb
+*.o
+*.sav
+*.bin
+mooneye-gb_hwtests
