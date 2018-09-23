@@ -719,13 +719,12 @@ void ADD_A_n(unsigned char n, unsigned char m_time) {
 }
 
 void ADC_A_n(unsigned char n, unsigned char m_time) {
-        unsigned short tmp = n;
+        unsigned char carry = GET_BIT(z80.f, CARRY);
         PRINT_ASM(n);
-        tmp += GET_BIT(z80.f, CARRY); // This might come back to bite me
-        SET_HC_ADD(z80.a, tmp);
-        SET_C_ADD(z80.a, tmp);
+        SET_HC_ADC(z80.a, n, carry);
+        SET_C_ADC(z80.a, n, carry);
 
-        z80.a += tmp;
+        z80.a = 0xFF & (z80.a + n + carry);
         BIT_CLEAR(z80.f, SUBTRACT);
 
         SET_Z_RES(z80.a);
@@ -748,15 +747,14 @@ void SUB_A_n(unsigned char n, unsigned char m_time) {
         z80.t = 4 * m_time;
 }
 void SBC_A_n(unsigned char n, unsigned char m_time) {
-        unsigned short tmp = n;
+        unsigned char carry = GET_BIT(z80.f, CARRY);
         PRINT_ASM(n);
-        tmp += GET_BIT(z80.f, CARRY);
         
         BIT_SET(z80.f, SUBTRACT);
-        SET_HC_SUB(z80.a, tmp);
-        SET_C_SUB(z80.a, tmp);
+        SET_HC_SBC(z80.a, n, carry);
+        SET_C_SBC(z80.a, n, carry);
 
-        z80.a -= tmp;
+        z80.a = 0xFF & (z80.a - n - carry);
         SET_Z_RES(z80.a);
         
         z80.m = m_time;

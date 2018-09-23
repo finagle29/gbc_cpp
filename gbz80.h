@@ -22,10 +22,14 @@
 
 #define SET_HC_ADD(a, b) BIT_EQUAL(z80.f, HALF_CARRY, (((a) & 0xF) + ((b) & 0xF)) >> 4)
 #define SET_C_ADD(a, b) BIT_EQUAL(z80.f, CARRY, ((unsigned long)((a) & 0xFF) + (unsigned long)((b) & 0xFF)) > 0xFF)
+#define SET_HC_ADC(a, b, c) BIT_EQUAL(z80.f, HALF_CARRY, (((a) & 0xF) + ((b) & 0xF) + c ) > 0xF)
+#define SET_C_ADC(a, b, c) BIT_EQUAL(z80.f, CARRY, ((unsigned long)((a) & 0xFF) + (unsigned long)((b) & 0xFF) + (unsigned long)c) > 0xFF)
 #define SET_Z_RES(a) BIT_EQUAL(z80.f, ZERO, (a) == 0)
 
 #define SET_C_SUB(a, b) BIT_EQUAL(z80.f, CARRY, b > a)
 #define SET_HC_SUB(a, b) BIT_EQUAL(z80.f, HALF_CARRY, ((a) & 0xF) < ((b) & 0xF))
+#define SET_C_SBC(a, b, c) BIT_EQUAL(z80.f, CARRY, 0 > (a - (unsigned short)b - c))
+#define SET_HC_SBC(a, b, c) BIT_EQUAL(z80.f, HALF_CARRY, 0 > (((a) & 0xF) - ((unsigned short)(b) & 0xF) - c))
 
 #define SET_HC_ADD_16(a, b) BIT_EQUAL(z80.f, HALF_CARRY, (((a) & 0xFFF) + ((b) & 0xFFF)) >> 12)
 #define SET_C_ADD_16(a, b) BIT_EQUAL(z80.f, CARRY, ((unsigned long)(a) + (unsigned long)(b)) > 0xFFFF)
