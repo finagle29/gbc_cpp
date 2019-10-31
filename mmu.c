@@ -12,7 +12,7 @@
 
 mmu_type *mmu = NULL;
 
-static char *file_name_base;
+char save_fname[50];
 
 
 void init_mmu() {
@@ -31,8 +31,8 @@ void print_n_bytes(unsigned short n) {
 }
 
 void save_sram() {
-        char *sav_fname = strcat(file_name_base, ".sav");
-        FILE *f = fopen(sav_fname, "wb");
+        printf("saving to %s\n", save_fname);
+        FILE *f = fopen(save_fname, "w+b");
         fwrite(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
         fclose(f);
 }
@@ -45,13 +45,14 @@ void load_bios(char* fname) {
 
 void load_rom(char* fname) {
         char fname_copy[50];
-        char sav_name[50];
         strcpy(fname_copy, fname);
-        file_name_base = strtok(fname_copy, ".");
+        char *base_name = strtok(fname_copy, ".");
+        if (base_name != NULL) {
+                snprintf(save_fname, 50, "%s.sav", base_name);
+        }
         unsigned char cart_type;
 
         FILE *f = fopen(fname, "rb");
-        // unsigned char rom_size;
         unsigned long rom_size;
 
         fseek(f, 0, SEEK_END);
@@ -74,6 +75,7 @@ void load_rom(char* fname) {
                 default:
                         mmu->mbc = 1;
         }
+        printf("using mbc%d\n", mmu->mbc);
 
         rewind(f);
 
@@ -91,15 +93,27 @@ void load_rom(char* fname) {
         fread(mmu->rom, sizeof(unsigned char), rom_size, f);
         fclose(f);
 
-        char *sav_fname = strcat(file_name_base, ".sav");
         struct stat buffer;
-        if (stat(sav_fname, &buffer) == 0) {
-                f = fopen(sav_fname, "rb");
-                fread(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
+        if (stat(save_fname, &buffer) == 0) {
+                printf("reading save file %s ...\n", save_fname);
+                f = fopen(save_fname, "rb");
+                size_t result = fread(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
+                printf("read %lu bytes\n", result);
                 fclose(f);
+        } else {
+                printf("save file %s does not exist\n", save_fname);
+                memset(mmu->eram, 0, 0x20000);
         }
 
         mmu->rom_bank = 1;
+        mmu->ram_bank = 0;
+        mmu->eram_enable = false;
+        mmu->inbios = true;
+
+        memset(mmu->vram, 0, 0x2000);
+        memset(mmu->wram, 0, 0x2000);
+        memset(mmu->zram, 0, 0x80);
+        memset(mmu->io, 0, 0x80);
 }
 
 unsigned char rb(unsigned short addr) {
@@ -238,6 +252,11 @@ void wb(unsigned short addr, unsigned char val) {
                                 if (!mmu->eram_enable) {
                                         save_sram();
                                 }
+                        } else if ((mmu->mbc == 2) && ((addr & 0x100) == 0)) {
+                                mmu->eram_enable = ((val & 0x0F) == 0x0A);
+                                if (!mmu->eram_enable) {
+                                        save_sram();
+                                }
                         }
                         break;
                 case 0x2000:
@@ -245,7 +264,7 @@ void wb(unsigned short addr, unsigned char val) {
                         if (mmu->mbc == 1) {
                                 mmu->rom_bank = (mmu->rom_bank & ~0x1F) | ((val ? val : val + 1) & 0x1F);
                         } else if (mmu->mbc == 3) {
-                                mmu->rom_bank = val & 0x7F;
+                                mmu->rom_bank = (val ? val : val + 1)  & 0x7F;
                         } else if (mmu->mbc == 2 && (addr & 0x100)) {
                                 mmu->rom_bank = val & 0x0F;
                         }
@@ -254,19 +273,25 @@ void wb(unsigned short addr, unsigned char val) {
                 /* ROM1 (unbanked) (16k) */
                 case 0x4000:
                 case 0x5000:
-                        if (mmu->mode) {
-                                mmu->ram_bank = val & 0x3;
-                        } else {
-                                mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 0x3) << 5));
+                        if (mmu->mbc == 1) {
+                                if (mmu->mode) {
+                                        mmu->ram_bank = val & 0x3;
+                                } else {
+                                        mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 0x3) << 5));
+                                }
+                        } else if (mmu->mbc == 3) {
+                                mmu->ram_bank = val & 0x7;
                         }
                         break;
                 case 0x6000:
                 case 0x7000:
-                        mmu->mode = val & 1; // MBC 1
-                        if (mmu->mode) {
-                                mmu->rom_bank &= 0x1F;
-                        } else {
-                                mmu->ram_bank = 0;
+                        if (mmu->mbc == 1) {
+                                mmu->mode = val & 1; // MBC 1
+                            if (mmu->mode) {
+                                    mmu->rom_bank &= 0x1F;
+                            } else {
+                                    mmu->ram_bank = 0;
+                            }
                         }
                         break;
 

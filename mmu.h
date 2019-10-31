@@ -21,7 +21,8 @@ typedef struct {
         bool inbios, eram_enable;
 
         unsigned char rom_bank, ram_bank;
-        unsigned char mode, mbc;
+        unsigned char mode, mbc; // mode = 0 means MBC1 is 16/8
+                                 // mode = 1 means MBC1 is 4/32
 
         unsigned char bios[0x100];
         unsigned char vram[0x2000];
@@ -33,5 +34,7 @@ typedef struct {
 } mmu_type;
 
 extern mmu_type *mmu;
+
+extern char save_fname[50];
 
 #endif
