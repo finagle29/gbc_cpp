@@ -31,18 +31,23 @@ int main(int argc, char* argv[]) {
 
         tileset = false;
         bgmap = false;
+        game_name[0] = 0;
 
-        if (argc == 1) {
-                strcpy(game_name, "cpu_instrs.gb");
-        } else {
-                strcpy(game_name, argv[1]);
-                for (i = 1; i < argc; i++) {
-                        if (strcmp(argv[i], "-d") == 0) {
-                                printf("%s\t%d\n", argv[i], strcmp(argv[i], "-d"));
-                                tileset = true;
-                                bgmap = true;
-                        }
+        // search through args for -d
+        // then set game_name
+        //
+        for (i = 0; i < argc; i++) {
+                if (strcmp(argv[i], "-d") == 0) {
+                        tileset = true;
+                        bgmap = true;
                 }
+                if (strstr(argv[i], ".gb") != NULL) {
+                        strcpy(game_name, argv[i]);
+                }
+        }
+
+        if (game_name[0] == 0) {
+                strcpy(game_name, "cpu_instrs.gb");
         }
 
 
@@ -137,6 +142,7 @@ int main(int argc, char* argv[]) {
                                                 case SDLK_z:
                                                         z80.int_f |= 1 << 4;
                                                         key.rows[1] &= 0xE;
+                                                        break;
                                                 case SDLK_RIGHT:
                                                         z80.int_f |= 1 << 4;
                                                         key.rows[2] &= 0xE;
@@ -155,16 +161,19 @@ int main(int argc, char* argv[]) {
                                                 case SDLK_DELETE:
                                                 case SDLK_BACKSPACE:
                                                         key.rows[1] |= 0x4;
+                                                        break;
                                                 case SDLK_UP:
                                                         key.rows[2] |= 0x4;
                                                         break;
                                                 case SDLK_x:
                                                         key.rows[1] |= 0x2;
+                                                        break;
                                                 case SDLK_LEFT:
                                                         key.rows[2] |= 0x2;
                                                         break;
                                                 case SDLK_z:
                                                         key.rows[1] |= 0x1;
+                                                        break;
                                                 case SDLK_RIGHT:
                                                         key.rows[2] |= 0x1;
                                                         break;
@@ -231,6 +240,16 @@ void INThandler(int sig) {
         printf("\tz80.ime: %d\n", z80.ime);
         printf("\n\n");
         printf("LCDC: 0x%02X\tSTAT: 0x%02X\n", gpu.gpu_ctrl, gpu.gpu_stat);
+
+        int c;
+        do {
+                printf("\nDo you really want to quit? (y/n) ");
+                c = getc(stdin);
+        } while (!(c == 'y' || c == 'Y' || c == 'n' || c == 'N'));
+
+        if (c == 'n' || c == 'N') {
+                return;
+        }
 
         FILE *f = fopen("hram_dump.bin", "wb");
         fwrite(mmu->zram, 1, 0x80, f);
