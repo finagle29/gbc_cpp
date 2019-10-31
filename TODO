@@ -1,0 +1,9 @@
+known broken things:
+DAA
+fix arg handling w/ no game
+
+improvements:
+better MBC handling in MMU
+RTC in MBC3
+MBC5
+write wrappers for gb_apu/Blip_Buffer.cpp ??
