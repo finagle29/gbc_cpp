@@ -3,4 +3,6 @@
 *.o
 *.sav
 *.bin
+test
+*.dSYM
 mooneye-gb_hwtests

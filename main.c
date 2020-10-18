@@ -6,7 +6,7 @@
 #include "gb_apu/MB_Wrapper.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <signal.h>
 #include <string.h>
 
