@@ -9,6 +9,7 @@ gbc_cpp
 mooneye-gb_hwtests/
 .vscode/
 
+Makefile
 build/
 CMakeFiles/
 Testing/
