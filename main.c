@@ -17,10 +17,12 @@ key_type key;
 _Noreturn void INThandler(int);
 
 Multi_Buffer* buf; // Stereo_Buffer
-const int out_size = 4096;
-blip_sample_t out_buf[out_size];
 
 SDL_AudioDeviceID dev;
+
+void audio_callback(void* userdata, char* stream, int len) {
+        Multi_Buffer_read_samples(buf, stream, len);
+}
 
 int main(int argc, char* argv[]) {
 
@@ -64,7 +66,7 @@ int main(int argc, char* argv[]) {
         atexit(SDL_Quit);
 
         buf = new_Stereo_Buffer();
-        blargg_err_t error = Multi_Buffer_set_sample_rate(buf, 44100);
+        blargg_err_t error = Multi_Buffer_set_sample_rate_msec(buf, 44100, 1000);
         if (error)
                 fprintf(stderr, "%s", error);
         Multi_Buffer_clock_rate(buf, 4194304);
@@ -79,6 +81,7 @@ int main(int argc, char* argv[]) {
         want.format = AUDIO_S16SYS;
         want.channels = 2;
         want.samples = 2048;
+        want.callback = audio_callback;
 
         dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
 
@@ -223,15 +226,9 @@ bool frame() {
 
         stereo = Gb_Apu_end_frame(apu, i*4);
         Multi_Buffer_end_frame(buf, i*4, stereo);
-        if (Multi_Buffer_samples_avail(buf) >= out_size) {
-                count = Multi_Buffer_read_samples(buf, out_buf, out_size);
-                SDL_QueueAudio(dev, out_buf, count);
-        }
 
         return quit;
 }
-
-
 
 void INThandler(int sig) {
         printf("At 0x%04X,\n\tz80.af: 0x%04X\tz80.bc: 0x%04X\n", z80.pc, z80.af, z80.bc);
