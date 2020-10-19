@@ -6,6 +6,7 @@ enable_testing()
 
 find_package(SDL2)
 
+string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
 message ([STATUS] "SDL2_INCLUDE_DIRS" ${SDL2_INCLUDE_DIRS})
 message ([STATUS] "SDL2_LIBRARIES" ${SDL2_LIBRARIES})
 
