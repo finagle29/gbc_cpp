@@ -11,11 +11,8 @@ addons:
   homebrew:
     packages:
     - sdl2
-
-addons:
   apt:
     packages:
-    - libsdl2
     - libsdl2-dev
 
 
