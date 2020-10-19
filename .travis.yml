@@ -12,6 +12,7 @@ addons:
     packages:
     - sdl2
     - boost
+    update: true
   apt:
     packages:
     - libsdl2-dev
