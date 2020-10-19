@@ -11,9 +11,11 @@ addons:
   homebrew:
     packages:
     - sdl2
+    - boost
   apt:
     packages:
     - libsdl2-dev
+    - libboost-all-dev
 
 
 script:
