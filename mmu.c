@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <time.h>
+
 #include "gbz80.h"
 #include "mmu.h"
 #include "gpu.h"
@@ -114,6 +116,7 @@ void load_rom(char* fname) {
         memset(mmu->wram, 0, 0x2000);
         memset(mmu->zram, 0, 0x80);
         memset(mmu->io, 0, 0x80);
+        // Need to handle RTC save from file
 }
 
 unsigned char rb(unsigned short addr) {
@@ -145,8 +148,27 @@ unsigned char rb(unsigned short addr) {
                 /* External RAM (8k) */
                 case 0xA000:
                 case 0xB000:
-                        if (mmu->eram_enable)
+                        if (mmu->eram_enable) {
+                                if (mmu->mbc == 3) {
+                                        switch (mmu->ram_bank)
+                                        {
+                                        case 0x8:
+                                                return mmu->rtc.seconds;
+                                        case 0x9:
+                                                return mmu->rtc.minutes;
+                                        case 0xA:
+                                                return mmu->rtc.hours;
+                                        case 0xB:
+                                                return mmu->rtc.day_counter & 0xFF;
+                                        case 0xC:
+                                                return (mmu->rtc.halt_flag << 6) |
+                                                        (mmu->rtc.day_counter_carry << 7) |
+                                                        GET_BIT(mmu->rtc.day_counter, 8);
+                                        }
+                                }
                                 return mmu->eram[mmu->ram_bank * 0x2000 + (addr & 0x1FFF)];
+                        }
+                                
                         return 0xFF;
 
                 /* Working RAM (8k) */
@@ -287,11 +309,26 @@ void wb(unsigned short addr, unsigned char val) {
                 case 0x7000:
                         if (mmu->mbc == 1) {
                                 mmu->mode = val & 1; // MBC 1
-                            if (mmu->mode) {
-                                    mmu->rom_bank &= 0x1F;
-                            } else {
-                                    mmu->ram_bank = 0;
-                            }
+                                if (mmu->mode) {
+                                        mmu->rom_bank &= 0x1F;
+                                } else {
+                                        mmu->ram_bank = 0;
+                                }
+                        } else if (mmu->mbc == 3) {
+                                if ((mmu->rtc.last_latch_write == 0) && (val == 1)) {
+                                        time_t rawtime;
+                                        struct tm* timeinfo;
+
+                                        time(&rawtime);
+                                        timeinfo = localtime(&rawtime);
+
+                                        mmu->rtc.seconds = timeinfo->tm_sec;
+                                        mmu->rtc.minutes = timeinfo->tm_min;
+                                        mmu->rtc.hours = timeinfo->tm_hour;
+                                        mmu->rtc.day_counter = timeinfo->tm_yday;
+                                        printf("latched RTC\n");
+                                }
+                                mmu->rtc.last_latch_write = val;
                         }
                         break;
 
@@ -317,6 +354,28 @@ void wb(unsigned short addr, unsigned char val) {
                 /* External RAM (8k) */
                 case 0xA000:
                 case 0xB000:
+                        if (mmu->mbc == 3) {
+                                switch (mmu->ram_bank)
+                                {
+                                case 0x8:
+                                        mmu->rtc.seconds = val;
+                                        return;
+                                case 0x9:
+                                        mmu->rtc.minutes = val;
+                                        return;
+                                case 0xA:
+                                        mmu->rtc.hours = val;
+                                        return;
+                                case 0xB:
+                                        mmu->rtc.day_counter = (mmu->rtc.day_counter & 0x100) | val;
+                                        return;
+                                case 0xC:
+                                        mmu->rtc.day_counter = (mmu->rtc.day_counter & 0xFF) | ((val & 1) << 8);
+                                        mmu->rtc.halt_flag = GET_BIT(val, 6);
+                                        mmu->rtc.day_counter_carry = GET_BIT(val, 7);
+                                        return;
+                                }
+                        }
                         mmu->eram[mmu->ram_bank * 0x2000 + (addr & 0x1FFF)] = val;
                         break;
 

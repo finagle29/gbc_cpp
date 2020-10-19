@@ -18,11 +18,21 @@ void wb(unsigned short addr, unsigned char val);
 void ww(unsigned short addr, unsigned short val);
 
 typedef struct {
+        unsigned char last_latch_write;
+        unsigned char seconds;
+        unsigned char minutes;
+        unsigned char hours;
+        unsigned short day_counter;
+        bool halt_flag, day_counter_carry;
+} rtc_type;
+
+typedef struct {
         bool inbios, eram_enable;
 
         unsigned char rom_bank, ram_bank;
         unsigned char mode, mbc; // mode = 0 means MBC1 is 16/8
                                  // mode = 1 means MBC1 is 4/32
+        rtc_type rtc;
 
         unsigned char bios[0x100];
         unsigned char vram[0x2000];
