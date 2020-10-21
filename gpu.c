@@ -34,6 +34,13 @@ static unsigned char bw_pal[4][3] = {
         {0, 0, 0}
 };
 
+static unsigned char mo_pal[4][3] = {
+        {255, 255, 176},
+        {255, 195, 0},
+        {234, 126, 11},
+        {13, 79, 32}
+};
+
 #define BGB
 
 #ifdef DMG
@@ -41,6 +48,9 @@ static unsigned char bw_pal[4][3] = {
 #endif
 #ifdef BGB
 #define PAL bgb_pal
+#endif
+#ifdef MO
+#define PAL mo_pal
 #endif
 #ifndef PAL
 #define PAL bw_pal
