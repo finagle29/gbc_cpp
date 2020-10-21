@@ -15,10 +15,10 @@
 #define GET_BIT(a, b) (((a) >> (b)) & 1ULL)
 #define BIT_EQUAL(a, n, x) (((a) ^= (-(unsigned long)(x) ^ (a)) & (1ULL << (n))))
 
-#define CARRY 4
-#define HALF_CARRY 5
-#define SUBTRACT 6
-#define ZERO 7
+#define CARRY 4 // C
+#define HALF_CARRY 5 // H
+#define SUBTRACT 6 // N
+#define ZERO 7 // Z
 
 #define SET_HC_ADD(a, b) BIT_EQUAL(z80.f, HALF_CARRY, (((a) & 0xF) + ((b) & 0xF)) >> 4)
 #define SET_C_ADD(a, b) BIT_EQUAL(z80.f, CARRY, ((unsigned long)((a) & 0xFF) + (unsigned long)((b) & 0xFF)) > 0xFF)

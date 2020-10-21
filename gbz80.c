@@ -952,30 +952,26 @@ void SWAP_HL() {
 
 
 void DAA() {
-        unsigned short s = z80.a;
         PRINT_ASM();
         if (!GET_BIT(z80.f, SUBTRACT)) {
-                if (GET_BIT(z80.f, HALF_CARRY) || (z80.a & 0x0F) > 0x09) {
-                        s += 0x06;
+                if (GET_BIT(z80.f, CARRY) || z80.a > 0x99) {
+                        z80.a += 0x60;
+                        BIT_SET(z80.f, CARRY);
                 }
-                if (GET_BIT(z80.f, CARRY) || z80.a > 0x9F) {
-                        s += 0x60;
+                if (GET_BIT(z80.f, HALF_CARRY) || (z80.a & 0x0F) > 0x09) {
+                        z80.a += 0x06;
                 }
         } else {
-                if (GET_BIT(z80.f, HALF_CARRY)) {
-                        s = (s - 0x06) & (0xFF);
-                }
                 if (GET_BIT(z80.f, CARRY)) {
-                        s -= 0x60;
                         z80.a -= 0x60;
+                }
+                if (GET_BIT(z80.f, HALF_CARRY)) {
+                        z80.a -= 0x06;
                 }
         }
 
-        z80.a = (unsigned char)(s & 0xFF);
         SET_Z_RES(z80.a);
         BIT_CLEAR(z80.f, HALF_CARRY);
-
-        if (s >= 0x100) BIT_SET(z80.f, CARRY);
 
         z80.m = 1;
         z80.t = 4;
