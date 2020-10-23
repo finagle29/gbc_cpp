@@ -21,7 +21,7 @@ Multi_Buffer* buf; // Stereo_Buffer
 SDL_AudioDeviceID dev;
 
 void audio_callback(void* userdata, char* stream, int len) {
-        Multi_Buffer_read_samples(buf, stream, len);
+        Multi_Buffer_read_samples(buf, stream, len/2);
 }
 
 int main(int argc, char* argv[]) {
