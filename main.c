@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
         want.freq = 44100;
         want.format = AUDIO_S16SYS;
         want.channels = 2;
-        want.samples = 2048;
+        want.samples = 4096;
         want.callback = audio_callback;
 
         dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
@@ -214,14 +214,8 @@ bool frame() {
                 cycles = fetch_dispatch_execute();
                 quit = cycles ? false : true;
                 i += cycles;
-
-
-
-                if (z80.pc == 0xC280) {
-                        __asm__("nop");
-                }
                 
-        } while (i < 17564 && !quit);
+        } while (i < 17556 && !quit);
         z80.clock.m = 0;
 
         stereo = Gb_Apu_end_frame(apu, i*4);
