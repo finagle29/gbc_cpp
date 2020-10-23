@@ -1,6 +1,8 @@
 # gbc_cpp
 GameBoy (eventually Color) Emulator in C(++)
 
+[![Build Status](https://travis-ci.com/finagle29/gbc_cpp.svg?branch=master)](https://travis-ci.com/finagle29/gbc_cpp)
+
 Use cmake to build.
 
 ```console
