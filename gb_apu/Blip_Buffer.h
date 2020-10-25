@@ -164,7 +164,7 @@ public:
 	
 	void next( int bass_shift = 9 ) {
 		accum -= accum >> bass_shift;
-		accum += ((long) *buf++ - Blip_Buffer::sample_offset_) << Blip_Buffer::accum_fract;
+		accum += ((unsigned long) *buf++ - Blip_Buffer::sample_offset_) << Blip_Buffer::accum_fract;
 	}
 	
 	void end( Blip_Buffer& blip_buf ) {

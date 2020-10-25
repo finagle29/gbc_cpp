@@ -112,7 +112,7 @@ private:
 	enum { buf_count = 3 };
 	Blip_Buffer bufs [buf_count];
 	channel_t chan;
-	bool stereo_added;
+	bool stereo_added = false;
 	bool was_stereo;
 	
 	void mix_stereo( blip_sample_t*, long );

@@ -379,7 +379,7 @@ long Blip_Buffer::read_samples( blip_sample_t* out, long max_samples, bool stere
 		{
 			long s = accum >> accum_fract;
 			accum -= accum >> bass_shift;
-			accum += (long (*buf++) - sample_offset_) << accum_fract;
+			accum += ((unsigned long) (*buf++) - sample_offset_) << accum_fract;
 			*out++ = (blip_sample_t) s;
 			
 			// clamp sample
@@ -393,7 +393,7 @@ long Blip_Buffer::read_samples( blip_sample_t* out, long max_samples, bool stere
 		{
 			long s = accum >> accum_fract;
 			accum -= accum >> bass_shift;
-			accum += (long (*buf++) - sample_offset_) << accum_fract;
+			accum += ((unsigned long) (*buf++) - sample_offset_) << accum_fract;
 			*out = (blip_sample_t) s;
 			out += 2;
 			
