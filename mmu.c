@@ -46,7 +46,7 @@ void load_bios(char* fname) {
 }
 
 void load_rom(char* fname) {
-        char fname_copy[50];
+        char fname_copy[200];
         strcpy(fname_copy, fname);
         char *base_name = strtok(fname_copy, ".");
         if (base_name != NULL) {

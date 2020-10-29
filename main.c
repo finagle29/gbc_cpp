@@ -26,7 +26,7 @@ void audio_callback(void* userdata, char* stream, int len) {
 
 int main(int argc, char* argv[]) {
 
-        char game_name[50];
+        char game_name[200];
         bool tileset, bgmap;
         int i;
         unsigned int lastTime = 0, currentTime;
