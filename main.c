@@ -216,7 +216,7 @@ bool frame() {
                 i += cycles;
                 
         } while (i < 17556 && !quit);
-        z80.clock.m = 0;
+        z80.clock.long_time = 0;
 
         stereo = Gb_Apu_end_frame(apu, i*4);
         Multi_Buffer_end_frame(buf, i*4, stereo);

@@ -5,4 +5,10 @@ improvements:
 better MBC handling in MMU
 RTC in MBC3
 MBC5
-write wrappers for gb_apu/Blip_Buffer.cpp ??
+write wrappers for gb_apu/Blip_Buffer.cpp ?? dont think this is needed
+better framerate setting
+    - renderer (audio) "creates" time steps
+    - emulator "consumes" time steps
+separate out emulation and rendering into separate threads
+    - send pixel updates to rendering thread along with 
+fix timing

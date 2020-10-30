@@ -1,0 +1,44 @@
+mooneye-gb_hwtests/acceptance/timer
+tests
+div_write.gb
+	passed
+rapid_toggle.gb
+	assertions:
+		B: OK
+		C: D9! (DA)
+tim00.gb
+	pass
+tim00_div_trigger.gb
+	passed
+tim01.gb
+	passed
+tim01_div_trigger.gb
+	passed
+tim10.gb
+	passed
+tim10_div_trigger.gb
+	passed
+tim11.gb
+	passed
+tim11_div_trigger.gb
+	passed
+tima_reload.gb
+	assertions
+		B: OK
+		C: OK
+		D: OK
+		E: 00! (FE)
+		H: OK
+		L: 00! (FE)
+time_write_reloading.gb
+	assertions
+		C: FE! (7F)
+		D: OK
+		E: OK
+		L: OK
+tma_write_reloading.gb
+	assertions:
+		C: OK
+		D: 7F! (FE)
+		E: 7F! (FE)
+		L: OK

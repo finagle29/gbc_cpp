@@ -8,9 +8,8 @@
 gbz80_type z80 = {.af = 0, .bc = 0, .de = 0, .hl = 0,
         .sp = 0, .pc = 0, .m = 0, .t = 0,
         .halt = false, .stop = false, .ime = false, .new_ime = false,
-        .int_f = 0, .int_en = 0, .clock = { /*.m = 0,
-        .t = 0,*/ .main = 0, .sub = 0, .div_c = 0,
-        .tima = 0, .tma = 0, .tac = 0}}, *z80_p;
+        .int_f = 0, .int_en = 0, .clock = { .m = 0,
+        .tima = 0, .tma = 0, .tac = 0, .old_tac = 0}}, *z80_p;
 
 static unsigned char op;
 void printerr(unsigned char);
@@ -405,7 +404,7 @@ int fetch_dispatch_execute() {
 
         /* do other things i guess */
 
-        z80.clock.m += z80.m;
+        // z80.clock.m += z80.m;
         // z80.clock.t += z80.t;
         cycles += z80.m;
         update_clock();
@@ -439,7 +438,7 @@ int fetch_dispatch_execute() {
                         RST60();
                         // handle keypad interaction
                 }
-                z80.clock.m += z80.m;
+                // z80.clock.m += z80.m;
                 // z80.clock.t += z80.t;
                 cycles += z80.m;
                 update_clock();
@@ -447,49 +446,40 @@ int fetch_dispatch_execute() {
 
         if (z80.new_ime) z80.ime = z80.new_ime;
 
+        z80.clock.long_time += cycles;
         return cycles;
 
 }
 
 
 void update_clock() {
-        z80.clock.sub += z80.m;
+        unsigned short old_m = z80.clock.m;
+        unsigned short threshold = 1 << (3 + 2 * (((z80.clock.tac & 3) - 1) & 3));
 
-        while (z80.clock.sub >= 4) {
-                z80.clock.main++;
-                z80.clock.sub -= 4;
-
-                z80.clock.div_c++;
-                if (z80.clock.div_c == 16) {
-                        z80.clock.div++;
-                        z80.clock.div_c = 0;
-                }
-                check_timer();
-        }
-
-        check_timer();
-}
-
-void check_timer() {
-        unsigned char threshold = 0xFF;
         if (!(z80.clock.old_tac & 4) && (z80.clock.tac & 4)) {
                 z80.clock.old_tac = z80.clock.tac;
-        } else if (z80.clock.tac & 4) {
-                switch (z80.clock.tac & 3)
-                {
-                        case 0: threshold = 64; break;
-                        case 1: threshold = 1; break;
-                        case 2: threshold = 4; break;
-                        case 3: threshold = 16; break;
+                if ((((z80.clock.m & 0xf) + (z80.t & 0xf)) & 0x10) == 0x10) {
+                        // time till carry in
+                        // use up this much time
+                        z80.t -= 0x10 - (z80.clock.m & 0xF);
+                        z80.clock.m += 0x10 - (z80.clock.m & 0xF);
                 }
-                if (z80.clock.main >= threshold) {
-                        z80.clock.main = 0;
-                        z80.clock.tima++;
-                        if (!z80.clock.tima) {
-                                z80.clock.tima = z80.clock.tma;
-                                z80.int_f |= 4;
+        }
+        if (z80.clock.tac & 4) {
+                while (z80.t-- > 0) {
+                        z80.clock.m++;
+
+                        if ((old_m & threshold) && !(z80.clock.m & threshold)) {
+                                z80.clock.tima++;
+                                if (!z80.clock.tima) {
+                                        z80.clock.tima = z80.clock.tma;
+                                        z80.int_f |= 4;
+                                }
                         }
+                        old_m = z80.clock.m;
                 }
+        } else {
+                z80.clock.m += z80.t;
         }
 }
 
@@ -627,12 +617,12 @@ void LDI_HL_A() {
 
 void LDH_n_A(unsigned char n) {
         PRINT_ASM(n);
-        wb(0xFF00 + n, z80.a);
 
         // assert(z80.a == rb(0xFF00 + n));
 
         z80.m = 3;
         z80.t = 12;
+        wb(0xFF00 + n, z80.a);
 }
 
 void LDH_A_n(unsigned char n) {

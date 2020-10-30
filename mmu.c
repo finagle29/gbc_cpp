@@ -202,7 +202,7 @@ unsigned char rb(unsigned short addr) {
                                         } else if (addr >= Gb_Apu_start_addr &&
                                                        addr <= Gb_Apu_end_addr) {
                                                 return Gb_Apu_read_register(apu,
-                                                                z80.clock.m,
+                                                                z80.clock.long_time,
                                                                 addr);
                                         } else {
                                         switch (addr) {
@@ -265,6 +265,7 @@ void ww(unsigned short addr, unsigned short val) {
 
 // TODO: MBC when writing to ROM
 void wb(unsigned short addr, unsigned char val) {
+        unsigned short threshold, old_threshold;
         switch (addr & 0xF000) {
                 /* BIOS (256b) or ROM0 */
                 case 0x0000:
@@ -416,7 +417,7 @@ void wb(unsigned short addr, unsigned char val) {
                                         if (addr >= Gb_Apu_start_addr &&
                                                         addr <= Gb_Apu_end_addr) {
                                                 Gb_Apu_write_register(apu,
-                                                                z80.clock.m,
+                                                                z80.clock.long_time,
                                                                 addr, val);
                                         }
                                         switch (addr) {
@@ -430,7 +431,21 @@ void wb(unsigned short addr, unsigned char val) {
                                                 }
                                                 break;
                                         case 0xFF04:
-                                                z80_p->clock.div = 0;
+                                                threshold = 3 + (2 * (((z80_p->clock.tac & 3) - 1) & 3));
+                                                printf("writing to DIV\n");
+                                                printf("enter div register: 0x%04X\n", z80_p->clock.m);
+                                                printf("t time: %d\n", z80_p->t);
+                                                printf("threshold: 0x%04X\n", 1 << threshold);
+                                                
+                                                if ((z80_p->clock.tac & 4) && (((z80_p->clock.m /*+ z80_p->t */) >> threshold) & 1)) {
+                                                        printf("div write tima inc\n");
+                                                        z80_p->clock.tima++;
+                                                        if (!z80_p->clock.tima) {
+                                                                z80_p->clock.tima = z80_p->clock.tma;
+                                                                z80_p->int_f |= 4;
+                                                        }
+                                                }
+                                                z80_p->clock.m = 0;
                                                 break;
                                         case 0xFF05:
                                                 z80_p->clock.tima = val;
@@ -441,6 +456,28 @@ void wb(unsigned short addr, unsigned char val) {
                                         case 0xFF07:
                                                 z80_p->clock.old_tac = z80_p->clock.tac;
                                                 z80_p->clock.tac = val;
+                                                old_threshold = 3 + (2 * (((z80_p->clock.old_tac & 3) - 1) & 3));
+                                                threshold = 3 + (2 * (((z80_p->clock.tac & 3) - 1) & 3));
+                                                if ((z80_p->clock.tac & z80_p->clock.old_tac & 4) &&
+                                                        (((z80_p->clock.m + z80_p->t - 4) >> old_threshold) & 1) &&
+                                                        !(((z80_p->clock.m + z80_p->t - 4) >> threshold) & 1)) {
+                                                        printf("tima inc on tac write 1\n");
+                                                        z80_p->clock.tima++;
+                                                        if (!z80_p->clock.tima) {
+                                                                z80_p->clock.tima = z80_p->clock.tma;
+                                                                z80_p->int_f |= 4;
+                                                        }
+                                                }
+                                                if ((~z80_p->clock.tac & z80_p->clock.old_tac & 4) &&
+                                                        (((z80_p->clock.m + z80_p->t - 4) >> old_threshold) & 1)) {
+                                                        printf("tima inc on tac write 2\n");
+                                                        z80_p->clock.tima++;
+                                                        if (!z80_p->clock.tima) {
+                                                                z80_p->clock.tima = z80_p->clock.tma;
+                                                                z80_p->int_f |= 4;
+                                                        }
+                                                }
+                                                // check to see if this results in falling edge, inc TIMA
                                                 break;
                                         case 0xFF0F:
                                                 z80_p->int_f = val;
