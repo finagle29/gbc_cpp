@@ -102,16 +102,7 @@ void dump_vram() {
 }
 
 void gpu_step() {
-        if (!GPU_DISP) {
-                gpu.mode = 0;
-                gpu.gpu_stat = gpu.mode |
-                        ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
-                        (gpu.gpu_stat & 0xF8);
-                return;
-        }
         unsigned char i;
-
-        gpu.mode_clock += z80.t;
 
         if (gpu.do_DMA) {
                 /*
@@ -124,12 +115,23 @@ void gpu_step() {
                 for (i = 0; i < z80.m; i++) {
                         gpu.oam[gpu.DMA_ptr] = rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
                         gpu.DMA_ptr++;
-
-                }
-                if (gpu.DMA_ptr == 0) {
-                        gpu.do_DMA = false;
+                        if (gpu.DMA_ptr >= 0xA0) {
+                                gpu.do_DMA = false;
+                                gpu.DMA_ptr = 0;
+                                break;
+                        }
                 }
         }
+
+        if (!GPU_DISP) {
+                gpu.mode = 0;
+                gpu.gpu_stat = gpu.mode |
+                        ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
+                        (gpu.gpu_stat & 0xF8);
+                return;
+        }
+
+        gpu.mode_clock += z80.t;
 
 
         switch (gpu.mode)

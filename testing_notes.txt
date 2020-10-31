@@ -1,5 +1,4 @@
 mooneye-gb_hwtests/acceptance/timer
-tests
 div_write.gb
 	passed
 rapid_toggle.gb
@@ -42,3 +41,30 @@ tma_write_reloading.gb
 		D: 7F! (FE)
 		E: 7F! (FE)
 		L: OK
+
+mooneye-gb_hwtests/acceptance/oam_dma
+basic.gb
+	passed
+reg_read.gb
+	passed
+sources-GS.gb
+	Fail: $FE00
+
+mooneye-gb_hwtests/acceptance/bits
+mem_oam.gb
+	passed
+reg_f.gb
+	passed
+unused_hwio-GS.gb
+	failed at $FF00
+	wrote 		0x1111 1111
+	expected	0b11
+	got			0b00
+
+mooneye-gb_hwtests/acceptance/instr
+daa.gb
+	passed
+
+mooneye-gb_hwtests/acceptance/interrupts
+ie_push.gb
+	R1: not cancelled
