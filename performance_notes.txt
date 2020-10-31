@@ -1,0 +1,24 @@
+New version (commit 310be29) (pixel framebuffer, copy to SDL texture once per frame and then render)
+
+Within frame:
+gpu_step: 70.3%
+renderscan: 30.8%
+SDL_DestroyTexture_REAL: 11.2%
+SDL_UpdateTexture_REAL: 9.0%
+SDL_CreateTexture_REAL: 6.1%
+METAL_RenderPresent: 2.9%
+
+rb: 3.1% (wow!)
+update_clock: 2.2%
+LDH_n_A: 1.9%
+
+old version (before commit 310be29)
+(Only on main screen of Pokemon Blue)
+Within frame:
+gpu_step: 96.9%
+	SDL_RenderPresent_REAL: 80.7%
+	renderscan: 13.9%
+
+update_clock: 0.2%
+rb: 0.1%
+LDH_n_A: 0.1%
