@@ -11,49 +11,82 @@ static SDL_Renderer *renderer, *vram_r, *bg_r;
 // static SDL_Texture* framebuffer;
 // static unsigned int *pixels;
 
+#define RGBA(r, g, b) (((((r << 8) | g) << 8) | b) << 8) | 0xFF
+
 static bool show_tileset, show_bgmap;
 
-static unsigned char dmg_pal[4][3] = {
+static unsigned char dmg_pal_a[4][3] = {
         {156, 189, 15},
         {140, 173, 15},
         {48, 98, 48},
         {15, 56, 15}
 };
 
-static unsigned char bgb_pal[4][3] = {
+static unsigned int dmg_pal[4] = {
+        RGBA(156, 189, 15),
+        RGBA(140, 173, 15),
+        RGBA(48, 98, 48),
+        RGBA(15, 56, 15)
+};
+
+static unsigned char bgb_pal_a[4][3] = {
         {224, 248, 208},
         {136, 192, 112},
         {52, 104, 86},
         {8, 24, 32}
 };
 
-static unsigned char bw_pal[4][3] = {
+static unsigned int bgb_pal[4] = {
+        RGBA(224, 248, 208),
+        RGBA(136, 192, 112),
+        RGBA(52, 104, 86),
+        RGBA(8, 24, 32)
+};
+
+static unsigned char bw_pal_a[4][3] = {
         {255, 255, 255},
         {170, 170, 170},
         {85, 85, 85},
         {0, 0, 0}
 };
 
-static unsigned char mo_pal[4][3] = {
+static unsigned int bw_pal[4] = {
+        RGBA(255, 255, 255),
+        RGBA(170, 170, 170),
+        RGBA(85, 85, 85),
+        RGBA(0, 0, 0)
+};
+
+static unsigned char mo_pal_a[4][3] = {
         {255, 255, 176},
         {255, 195, 0},
         {234, 126, 11},
         {13, 79, 32}
 };
 
+static unsigned int mo_pal[4] = {
+        RGBA(255, 255, 176),
+        RGBA(255, 195, 0),
+        RGBA(234, 126, 11),
+        RGBA(13, 79, 32)
+};
+
+unsigned int pixels[160*144];
+
 #define BGB
 
-#ifdef DMG
-#define PAL dmg_pal
-#endif
-#ifdef BGB
-#define PAL bgb_pal
-#endif
-#ifdef MO
-#define PAL mo_pal
-#endif
-#ifndef PAL
-#define PAL bw_pal
+#if defined(DMG)
+        #define PAL dmg_pal
+        #define PAL_A dmg_pal_a
+#elif defined(BGB)
+        #define PAL bgb_pal
+        #define PAL_A bgb_pal_a
+#elif defined(MO)
+        #define PAL mo_pal
+        #define PAL_A mo_pal_a
+#else
+        #define PAL bw_pal
+        #define PAL_A bw_pal_a
 #endif
 
 void dump_vram() {
@@ -132,11 +165,13 @@ void gpu_step() {
                                         // enter VBlank
                                         gpu.mode = 1;
                                         z80.int_f |= 1;
-
-                                        // SDL_UpdateTexture(framebuffer, NULL, pixels, 160 * sizeof(unsigned int));
-                                        // SDL_RenderClear(renderer);
-                                        // SDL_RenderCopy(renderer, framebuffer, NULL, NULL);
+                                        
                                         renderscan();
+                                        SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
+                                        SDL_UpdateTexture(texture, NULL, pixels, 160 * sizeof(unsigned int));
+                                        
+                                        SDL_RenderCopy(renderer, texture, NULL, NULL);
+                                        SDL_DestroyTexture(texture);
                                         SDL_RenderPresent(renderer);
                                         if (show_tileset) showTileSet();
                                         if (show_bgmap) showBGMap();
@@ -182,6 +217,9 @@ void renderscan() {
         unsigned short tile;
         unsigned char scanline_row[160];
 
+        if (gpu.line > 144) {
+                return;
+        }
 
 
         mapoffs += (((gpu.line + gpu.scrollY) & 0xFF) >> 3) << 5;
@@ -195,12 +233,7 @@ void renderscan() {
 
                         scanline_row[i] = gpu.tileset[tile][y][x];
 
-                        // color = 255 - 255*color/3;
-
-                        // pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
-
-                        SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                        SDL_RenderDrawPoint(renderer, i, gpu.line);
+                        pixels[i + (gpu.line)*160] = PAL[color];
 
                         x++;
                         if (x == 8) {
@@ -231,12 +264,7 @@ void renderscan() {
 
                                 scanline_row[i] = gpu.tileset[tile][y][x];
 
-                                // color = 255 - 255*color/3;
-
-                                // pixels[i + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
-
-                                SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                                SDL_RenderDrawPoint(renderer, i, gpu.line);
+                                pixels[i + (gpu.line)*160] = PAL[color];
 
                                 x++;
                                 if (x == 8) {
@@ -290,25 +318,21 @@ void renderscan() {
                                                         color = pal >> (color * 2);
                                                         color &= 3;
 
-                                                        // color = 255 - 255 * color / 3;
-                                                        // pixels[x+tile_x + (gpu.line)*160] = (unsigned int)(((color << 8 | color) << 8 | color) << 8 | 0xFF);
-
-                                                        SDL_SetRenderDrawColor(renderer, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                                                        SDL_RenderDrawPoint(renderer, x+tile_x, gpu.line);
+                                                        pixels[x + tile_x + (gpu.line)*160] = PAL[color];
                                                 }
                                         }
                                 }
                         }
                 }
         }
-
-
 }
 
 void showBGMap() {
         unsigned char x, y, color;
         unsigned short tile, tile_addr;
         unsigned short mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
+
+        unsigned int pixels_bg[256*256];
 
         for (tile = 0; tile < 1024; tile++) {
                 tile_addr = gpu.vram[mapoffs + tile];
@@ -318,13 +342,16 @@ void showBGMap() {
                         for (y = 0; y < 8; y++) {
                                 color = gpu.bg_pal >> (gpu.tileset[tile_addr][y][x] * 2);
                                 color &= 3;
-                                // color = 255 - 255*color/3;
 
-                                SDL_SetRenderDrawColor(bg_r, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                                SDL_RenderDrawPoint(bg_r, (tile % 32)*8 + x, (tile / 32)*8 + y);
+                                pixels_bg[((tile / 32)*8 + y) * 256 + (tile % 32)*8 + x] = PAL[color];
+
                         }
                 }
         }
+        SDL_Texture* texture = SDL_CreateTexture(bg_r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, 256, 256);
+        SDL_UpdateTexture(texture, NULL, pixels_bg, 256 * sizeof(unsigned int));
+        SDL_RenderCopy(bg_r, texture, NULL, NULL);
+        SDL_DestroyTexture(texture);
 
         SDL_Rect screen1 = {gpu.scrollX, gpu.scrollY, 160, 144};
         SDL_Rect screen2 = {gpu.scrollX, gpu.scrollY, 160, 144};
@@ -348,21 +375,27 @@ void showTileSet() {
         unsigned char x, y, color;
         unsigned short tile;
 
+        unsigned int pixels_vram[17*16*17*24];
+        memset(pixels_vram, 0xFF, 17*16*24*17*sizeof(unsigned int));
+
         for (tile = 0; tile < 384; tile++) {
                 for (x = 0; x < 8; x++) {
                         for (y = 0; y < 8; y++) {
                                 color = gpu.bg_pal >> (gpu.tileset[tile][y][x] * 2);
                                 color &= 3;
-                                // color = 255 - 255*color/3;
 
-                                SDL_SetRenderDrawColor(vram_r, PAL[color][0], PAL[color][1], PAL[color][2], 255);
-                                SDL_RenderDrawPoint(vram_r, (tile % 16)*17 + 2*x, (tile / 16)*17 + 2*y);
-                                SDL_RenderDrawPoint(vram_r, (tile % 16)*17 + 2*x + 1, (tile / 16)*17 + 2*y);
-                                SDL_RenderDrawPoint(vram_r, (tile % 16)*17 + 2*x + 1, (tile / 16)*17 + 2*y + 1);
-                                SDL_RenderDrawPoint(vram_r, (tile % 16)*17 + 2*x, (tile / 16)*17 + 2*y + 1);
+                                pixels_vram[((tile / 16)*17 + 2*y)*17*16 + (tile % 16)*17 + 2*x] = PAL[color];
+                                pixels_vram[((tile / 16)*17 + 2*y)*17*16 + (tile % 16)*17 + 2*x + 1] = PAL[color];
+                                pixels_vram[((tile / 16)*17 + 2*y + 1)*17*16 + (tile % 16)*17 + 2*x] = PAL[color];
+                                pixels_vram[((tile / 16)*17 + 2*y + 1)*17*16 + (tile % 16)*17 + 2*x + 1] = PAL[color];
+
                         }
                 }
         }
+        SDL_Texture* texture = SDL_CreateTexture(vram_r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, 17*16, 17*24);
+        SDL_UpdateTexture(texture, NULL, pixels_vram, 17*16 * sizeof(unsigned int));
+        SDL_RenderCopy(vram_r, texture, NULL, NULL);
+        SDL_DestroyTexture(texture);
         SDL_RenderPresent(vram_r);
 }
 
@@ -384,8 +417,6 @@ void setup(bool tileset, bool bgmap) {
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
-        // framebuffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
-        // pixels = (unsigned int *)malloc(sizeof(unsigned int) * 160 * 144);
 
 
         if (tileset) {
@@ -401,7 +432,7 @@ void setup(bool tileset, bool bgmap) {
                 SDL_CreateWindowAndRenderer(
                                 256, 256, 0,
                                 &bg_w, &bg_r);
-                SDL_SetWindowPosition(bg_w, x+160, y);
+                SDL_SetWindowPosition(bg_w, x+160*2, y);
                 SDL_SetRenderDrawColor(bg_r, 255, 253, 208, 255);
                 SDL_RenderClear(bg_r);
                 SDL_RenderPresent(bg_r);
@@ -417,7 +448,6 @@ void setup(bool tileset, bool bgmap) {
 
 void cleanup() {
         SDL_DestroyWindow(window);
-        // free(pixels);
         SDL_DestroyWindow(vram_w);
         SDL_DestroyWindow(bg_w);
         SDL_DestroyRenderer(renderer);
