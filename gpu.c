@@ -72,6 +72,7 @@ static unsigned int mo_pal[4] = {
 };
 
 unsigned int pixels[160*144];
+unsigned int prev_pixels[160*144];
 
 #define BGB
 
@@ -164,13 +165,19 @@ void gpu_step() {
                                 gpu.line++;
 
                                 if (gpu.line == 143) {
+                                        unsigned int tmp[160*144];
                                         // enter VBlank
                                         gpu.mode = 1;
                                         z80.int_f |= 1;
+
+                                        for (int i = 0; i < 160*144; i++) {
+                                                tmp[i] = (pixels[i] / 2 + prev_pixels[i] / 2);
+                                                prev_pixels[i] = pixels[i];
+                                        }
                                         
                                         renderscan();
                                         SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
-                                        SDL_UpdateTexture(texture, NULL, pixels, 160 * sizeof(unsigned int));
+                                        SDL_UpdateTexture(texture, NULL, tmp, 160 * sizeof(unsigned int));
                                         
                                         SDL_RenderCopy(renderer, texture, NULL, NULL);
                                         SDL_DestroyTexture(texture);
