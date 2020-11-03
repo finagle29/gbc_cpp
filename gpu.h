@@ -30,10 +30,13 @@ typedef struct {
 
 typedef struct {
         unsigned char mode;
+        unsigned char tile_counter;
         unsigned short tile;
         unsigned char xoffs;
         unsigned char pixels[8];
         bool ready;
+        bool window;
+        bool window_just_triggered;
 } fetcher_t;
 
 typedef struct {

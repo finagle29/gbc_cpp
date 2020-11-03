@@ -106,12 +106,35 @@ void fetcher_tick() {
         unsigned short mapoffs;
         unsigned char lineoffs, upper, lower;
         // need to add check for window!
+        // if window triggered (on this line)
+        if ((gpu.xpos == (gpu.wdow_x - 7)) && (gpu.line >= gpu.wdow_y) && GPU_WDOW && !gpu.fetcher.window_just_triggered) {
+                // clear FIFO
+                gpu.bg_FIFO.size = 0;
+                gpu.bg_FIFO.start = 0;
+                gpu.bg_FIFO.end = 0;
+
+                // restart fetcher
+                gpu.fetcher.window = true;
+                gpu.fetcher.mode = 0;
+                gpu.fetcher.ready = false;
+                gpu.fetcher.tile_counter = 0;
+                gpu.fetcher.window_just_triggered = true;
+        }
+                // restart fetcher
         switch (gpu.fetcher.mode) {
                 case 0:
                         // read tile #
-                        mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
-                        lineoffs = ((gpu.scrollX + gpu.xpos + 16) >> 3) & 0x1F;
-                        mapoffs += (((gpu.line + gpu.scrollY) & 0xFF) >> 3) << 5;
+                        if (gpu.fetcher.window) {
+                                mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
+                                lineoffs = gpu.fetcher.tile_counter; // starting at gpu.xpos == gpu.wdow_x - 7
+                                                // and incrementing after every tile fetched
+                                                // maybe just give the fetcher its own tile counter
+                                mapoffs += (((gpu.line - gpu.wdow_y) & 0xFF) >> 3) << 5;
+                        } else {
+                                mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
+                                lineoffs = (gpu.fetcher.tile_counter + ((gpu.scrollX) >> 3)) & 0x1F;
+                                mapoffs += (((gpu.line + gpu.scrollY) & 0xFF) >> 3) << 5;
+                        }
                         if (gpu.line > 144) {
                                 return;
                         }
@@ -157,6 +180,7 @@ void fetcher_tick() {
                 case 7:
                 // idle
                         gpu.fetcher.mode = 0;
+                        gpu.fetcher.tile_counter++;
                         // printf("fetcher tick idle\n");
                         break;
 
@@ -191,7 +215,6 @@ void gpu_tick() {
                         if (gpu.mode_clock >= 80) {
                                 gpu.mode_clock = 0;
                                 gpu.mode = 3;
-                                gpu.xpos = -16;
                         }
                         break;
                 // VRAM read mode, scanline active
@@ -204,7 +227,6 @@ void gpu_tick() {
                         
                         if (gpu.mode_clock < 16) {
                                 fetcher_tick();
-                                gpu.xpos++;
                                 gpu.mode_clock++;
                                 break;
                         }
@@ -214,11 +236,7 @@ void gpu_tick() {
                                 FIFO_pop(&gpu.bg_FIFO);
                                 fetcher_tick();
                                 gpu.mode_clock++;
-                                gpu.xpos++;
                                 break;
-                        }
-                        if (gpu.mode_clock == 16 + (gpu.scrollX & 7)) {
-                                gpu.xpos = 0;
                         }
 
                         // at each step, check for window!!
@@ -253,6 +271,9 @@ void gpu_tick() {
                                 gpu.fetcher.mode = 0;
                                 gpu.fetcher.xoffs = 0;
                                 gpu.fetcher.ready = false;
+                                gpu.fetcher.window = false;
+                                gpu.fetcher.window_just_triggered = false;
+                                gpu.fetcher.tile_counter = 0;
 
                                 gpu.bg_FIFO.size = 0;
                                 gpu.bg_FIFO.start = 0;
