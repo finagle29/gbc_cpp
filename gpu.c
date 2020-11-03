@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <stdio.h>
+#include <assert.h>
 #include "gpu.h"
 #include "gbz80.h"
 #include "mmu.h"
@@ -101,28 +102,76 @@ void dump_vram() {
         fclose(f);
 }
 
-void gpu_step() {
-        unsigned char i;
-
-        if (gpu.do_DMA) {
-                /*
-                printf("DMA\n");
-                for (i = 0; i < 0xA0; i++) {
-                        gpu.oam[i] = rb((unsigned short)(gpu.DMA << 8) + i);
-                }
-                gpu.do_DMA = false;
-                */
-                for (i = 0; i < z80.m; i++) {
-                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
-                        gpu.DMA_ptr++;
-                        if (gpu.DMA_ptr >= 0xA0) {
-                                gpu.do_DMA = false;
-                                gpu.DMA_ptr = 0;
-                                break;
+void fetcher_tick() {
+        unsigned short mapoffs;
+        unsigned char lineoffs, upper, lower;
+        switch (gpu.fetcher.mode) {
+                case 0:
+                        // read tile #
+                        mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
+                        lineoffs = ((gpu.scrollX + gpu.xpos) >> 3) & 0x1F;
+                        if (gpu.line > 144) {
+                                return;
                         }
-                }
-        }
+                        mapoffs += (((gpu.line + gpu.scrollY) & 0xFF) >> 3) << 5;
+                        gpu.fetcher.tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
+                        if (!GPU_BG_SET && gpu.fetcher.tile < 128) gpu.fetcher.tile += 256;
+                        gpu.fetcher.mode++;
+                        // printf("fetcher tick read tile\n");
+                        break;
+                case 1:
+                        gpu.fetcher.mode++;
+                        break;
 
+                case 2:
+                // read byte 1 of tile
+                        lower = gpu.vram[gpu.fetcher.tile * 16 + 2 * ((gpu.line + gpu.scrollY) & 7)];
+                        for (int i = 0; i < 8; i++) {
+                                gpu.fetcher.pixels[7-i] = GET_BIT(lower, i);
+                                // gpu.fetcher.pixels[i] = 1 & gpu.tileset[gpu.fetcher.tile][7 & (gpu.line + gpu.scrollY)][i];
+                        }
+                        gpu.fetcher.mode++;
+                        // printf("fetcher tick read byte 1\n");
+                        break;
+                case 3:
+                        gpu.fetcher.mode++;
+                        break;
+                case 4:
+                // read byte 2 of tile
+                        upper = gpu.vram[gpu.fetcher.tile * 16 + 2 * ((gpu.line + gpu.scrollY) & 7) + 1];
+                        for (int i = 0; i < 8; i++) {
+                                gpu.fetcher.pixels[7-i] |= GET_BIT(upper, i) << 1;
+                                // gpu.fetcher.pixels[i] |= 2 & gpu.tileset[gpu.fetcher.tile][7 & (gpu.line + gpu.scrollY)][i];
+                        }
+                        gpu.fetcher.mode++;
+                        gpu.fetcher.ready = true;
+                        // printf("fetcher tick read byte 2\n");
+                        break;
+                case 5:
+                        gpu.fetcher.mode++;
+                        break;
+                case 6:
+                        gpu.fetcher.mode++;
+                        break;
+                case 7:
+                // idle
+                        gpu.fetcher.mode = 0;
+                        // printf("fetcher tick idle\n");
+                        break;
+
+        }
+        if (gpu.fetcher.ready && (gpu.bg_FIFO.size <= 8)) {
+                memcpy(gpu.bg_FIFO.FIFO + gpu.bg_FIFO.end, gpu.fetcher.pixels, 8);
+                gpu.bg_FIFO.size += 8;
+                gpu.bg_FIFO.end = (gpu.bg_FIFO.end + 8) % 16;
+                gpu.fetcher.ready = false;
+                // printf("fetcher tick push to FIFO\n");
+        }
+}
+
+void gpu_tick() {
+        // consume 1 T-time in the GPU
+        // ignore DMA, since that is done in M-time
         if (!GPU_DISP) {
                 gpu.mode = 0;
                 gpu.gpu_stat = gpu.mode |
@@ -131,44 +180,99 @@ void gpu_step() {
                 return;
         }
 
-        gpu.mode_clock += z80.t;
-
-
         switch (gpu.mode)
         {
                 // OAM read mode, scanline is active
+                // actually read OAM here
                 case 2:
+                        // find up to 10 visible sprites
+                        gpu.mode_clock++;
                         if (gpu.mode_clock >= 80) {
                                 gpu.mode_clock = 0;
                                 gpu.mode = 3;
                         }
                         break;
-
                 // VRAM read mode, scanline active
                 // treat end of mode 3 as end of scanline
+                // push pixels from FIFO to framebuffer
                 case 3:
-                        if (gpu.mode_clock >= 172) {
+                        // discard gpu.scrollX pixels from FIFO
+                        // need to check that FIFO always has more than 8 pixels in it!!
+                        // ONLY DO THIS AT BEGINNING OF LINE!!!!!
+                        if (gpu.mode_clock < 16) {
+                                fetcher_tick();
+                                gpu.xpos++;
+                                gpu.mode_clock++;
+                                break;
+                        }
+                        if (gpu.mode_clock == 16) {
+                                gpu.xpos = 0;
+                        }
+                        if (gpu.mode_clock < 16 + (gpu.scrollX & 8)) {
+                                // FIFO_pop(&gpu.sprite_FIFO);
+                                FIFO_pop(&gpu.bg_FIFO);
+                                fetcher_tick();
+                                gpu.mode_clock++;
+                                break;
+                        }
+
+                        // at each step, check for window!!
+
+                                // push 2 pixels
+                                push_pixel();
+                                fetcher_tick();
+                                gpu.xpos++;
+                                gpu.mode_clock++;
+
+                                // fetcher reads tile #
+
+                                // push 2 pixles
+                                // fetcher reads 1 byte of data from VRAM
+                                // push 2 pixels
+                                // fetcher reads 1 byte of data from VRAM
+                                // push 2 pixels
+                                // load FIFO from fetcher
+                        
+                        // if window
+                                // clear FIFO
+                                // fetcher reads tile #
+                                // fetcher reads 1 byte of data from VRAM
+                                // fetcher reads 1 byte of data from VRAM
+                                // load FIFO from fetcher
+
+                        if (gpu.xpos >= 160) {
                                 // enter HBlank
                                 gpu.mode_clock = 0;
                                 gpu.mode = 0;
+                                gpu.xpos = 0;
+                                
+                                gpu.fetcher.mode = 0;
+                                gpu.fetcher.xoffs = 0;
+                                gpu.fetcher.ready = false;
+
+                                gpu.bg_FIFO.size = 0;
+                                gpu.bg_FIFO.start = 0;
+                                gpu.bg_FIFO.end = 0;
 
                                 // Write a scanline to the framebuffer
-                                renderscan();
+                                // renderscan();
                         }
                         break;
 
                 // HBlank. after the last one push the screen data
                 case 0:
+                        gpu.mode_clock++;
                         if (gpu.mode_clock >= 204) {
                                 gpu.mode_clock = 0;
                                 gpu.line++;
+                                // printf("\n");
 
-                                if (gpu.line == 143) {
+                                if (gpu.line >= 143) {
                                         // enter VBlank
                                         gpu.mode = 1;
                                         z80.int_f |= 1;
                                         
-                                        renderscan();
+                                        // renderscan();
                                         SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
                                         SDL_UpdateTexture(texture, NULL, pixels, 160 * sizeof(unsigned int));
                                         
@@ -187,14 +291,17 @@ void gpu_step() {
 
                 // VBlank
                 case 1:
+                        gpu.mode_clock++;
                         if (gpu.mode_clock >= 456) {
-                                gpu.mode_clock = 0;
                                 gpu.line++;
 
                                 if (gpu.line > 153) {
                                         // restart scanning mode
                                         gpu.mode = 2;
                                         gpu.line = 0;
+                                        gpu.mode_clock = 0;
+                                        gpu.bg_FIFO.size = 0;
+                                        // printf("\n\n");
                                 }
                         }
                         break;
@@ -207,6 +314,35 @@ void gpu_step() {
         }
         gpu.gpu_stat = gpu.mode | ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
                 (gpu.gpu_stat & 0xF8);
+}
+
+void gpu_step() {
+        unsigned char i;
+        unsigned char time_to_consume = z80.t;
+
+        if (gpu.do_DMA) {
+                for (i = 0; i < z80.m; i++) {
+                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
+                        gpu.DMA_ptr++;
+                        if (gpu.DMA_ptr >= 0xA0) {
+                                gpu.do_DMA = false;
+                                gpu.DMA_ptr = 0;
+                                break;
+                        }
+                }
+        }
+
+        for (int t = 0; t < z80.t; t++) {
+                gpu_tick();
+        }
+        return;
+
+}
+
+void fetch_pixels_FIFO() {
+        // allowed to use z80.t cycles
+        // do I need an internal state?
+        return;
 }
 
 void renderscan() {
@@ -458,3 +594,21 @@ void cleanup() {
         SDL_Quit();
 }
 
+unsigned char FIFO_pop(FIFO_t* fifo) {
+        assert(fifo->size > 0);
+        unsigned char val = fifo->FIFO[fifo->start];
+        fifo->start = (fifo->start + 1) % 16;
+        fifo->size--;
+        return val;
+}
+
+void push_pixel() {
+        unsigned char bg_pix, sprite_pix, color;
+        bg_pix = FIFO_pop(&gpu.bg_FIFO);
+        // sprite_pix = FIFO_pop(&gpu.sprite_FIFO);
+        // for rn, ignore sprite_pix
+        color = gpu.bg_pal >> (bg_pix * 2);
+        color &= 3;
+        // printf("%d", color);
+        pixels[(gpu.line * 160) + gpu.xpos] = PAL[color];
+}

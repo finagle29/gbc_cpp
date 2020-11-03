@@ -18,6 +18,24 @@ void dump_vram(void);
 void showTileSet(void);
 void showBGMap(void);
 
+void fetch_pixels_FIFO(void);
+
+typedef struct {
+        // internal state goes here
+        unsigned char start;
+        unsigned char end;
+        unsigned char size;
+        unsigned char FIFO[16];
+} FIFO_t;
+
+typedef struct {
+        unsigned char mode;
+        unsigned short tile;
+        unsigned char xoffs;
+        unsigned char pixels[8];
+        bool ready;
+} fetcher_t;
+
 typedef struct {
         unsigned char oam[0xA0];
         unsigned char vram[0x2000];
@@ -33,6 +51,11 @@ typedef struct {
         unsigned char wdow_y, wdow_x;
 
         unsigned char tileset[384][8][8];
+
+        unsigned char xpos;
+        FIFO_t sprite_FIFO;
+        FIFO_t bg_FIFO;
+        fetcher_t fetcher;
 } gpu_type;
 
 extern gpu_type gpu;
@@ -41,7 +64,8 @@ void setup(bool, bool);
 void cleanup(void);
 
 void gpu_step(void);
-
+void push_pixel(void);
+unsigned char FIFO_pop(FIFO_t* fifo);
 
 
 
