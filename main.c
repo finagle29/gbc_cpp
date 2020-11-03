@@ -230,7 +230,8 @@ void INThandler(int sig) {
         printf("\tz80.if: 0x%02X\tz80.ie: 0x%02X\n", z80.int_f, z80.int_en);
         printf("\tz80.ime: %d\n", z80.ime);
         printf("\n\n");
-        printf("GPU line: %d\tGPU xpos: %d\n", gpu.line, gpu.xpos);
+        printf("GPU line: %d\tGPU xpos: %d\tGPU SCRX: %d\n", gpu.line, gpu.xpos, gpu.scrollX);
+        printf("GPU WDWX: %d\tGPU WDWY: %d\n", gpu.wdow_x, gpu.wdow_y);
         printf("BG FIFO size: %d\n", gpu.bg_FIFO.size);
         printf("LCDC: 0x%02X\tSTAT: 0x%02X\n", gpu.gpu_ctrl, gpu.gpu_stat);
 

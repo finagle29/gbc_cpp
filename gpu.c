@@ -105,15 +105,16 @@ void dump_vram() {
 void fetcher_tick() {
         unsigned short mapoffs;
         unsigned char lineoffs, upper, lower;
+        // need to add check for window!
         switch (gpu.fetcher.mode) {
                 case 0:
                         // read tile #
                         mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
-                        lineoffs = ((gpu.scrollX + gpu.xpos) >> 3) & 0x1F;
+                        lineoffs = ((gpu.scrollX + gpu.xpos + 16) >> 3) & 0x1F;
+                        mapoffs += (((gpu.line + gpu.scrollY) & 0xFF) >> 3) << 5;
                         if (gpu.line > 144) {
                                 return;
                         }
-                        mapoffs += (((gpu.line + gpu.scrollY) & 0xFF) >> 3) << 5;
                         gpu.fetcher.tile = (unsigned short)gpu.vram[mapoffs + lineoffs];
                         if (!GPU_BG_SET && gpu.fetcher.tile < 128) gpu.fetcher.tile += 256;
                         gpu.fetcher.mode++;
@@ -190,6 +191,7 @@ void gpu_tick() {
                         if (gpu.mode_clock >= 80) {
                                 gpu.mode_clock = 0;
                                 gpu.mode = 3;
+                                gpu.xpos = -16;
                         }
                         break;
                 // VRAM read mode, scanline active
@@ -199,30 +201,32 @@ void gpu_tick() {
                         // discard gpu.scrollX pixels from FIFO
                         // need to check that FIFO always has more than 8 pixels in it!!
                         // ONLY DO THIS AT BEGINNING OF LINE!!!!!
+                        
                         if (gpu.mode_clock < 16) {
                                 fetcher_tick();
                                 gpu.xpos++;
                                 gpu.mode_clock++;
                                 break;
                         }
-                        if (gpu.mode_clock == 16) {
-                                gpu.xpos = 0;
-                        }
-                        if (gpu.mode_clock < 16 + (gpu.scrollX & 8)) {
+                        
+                        if (gpu.mode_clock < 16 + (gpu.scrollX & 7)) {
                                 // FIFO_pop(&gpu.sprite_FIFO);
                                 FIFO_pop(&gpu.bg_FIFO);
                                 fetcher_tick();
                                 gpu.mode_clock++;
+                                gpu.xpos++;
                                 break;
+                        }
+                        if (gpu.mode_clock == 16 + (gpu.scrollX & 7)) {
+                                gpu.xpos = 0;
                         }
 
                         // at each step, check for window!!
 
                                 // push 2 pixels
-                                push_pixel();
-                                fetcher_tick();
-                                gpu.xpos++;
-                                gpu.mode_clock++;
+                        push_pixel();
+                        fetcher_tick();
+                        gpu.mode_clock++;
 
                                 // fetcher reads tile #
 
@@ -294,6 +298,7 @@ void gpu_tick() {
                         gpu.mode_clock++;
                         if (gpu.mode_clock >= 456) {
                                 gpu.line++;
+                                gpu.mode_clock = 0;
 
                                 if (gpu.line > 153) {
                                         // restart scanning mode
@@ -332,7 +337,10 @@ void gpu_step() {
                 }
         }
 
-        for (int t = 0; t < z80.t; t++) {
+        for (int m = 0; m < z80.m; m++) {
+                gpu_tick();
+                gpu_tick();
+                gpu_tick();
                 gpu_tick();
         }
         return;
@@ -595,20 +603,25 @@ void cleanup() {
 }
 
 unsigned char FIFO_pop(FIFO_t* fifo) {
-        assert(fifo->size > 0);
-        unsigned char val = fifo->FIFO[fifo->start];
-        fifo->start = (fifo->start + 1) % 16;
-        fifo->size--;
-        return val;
+        if (fifo->size > 0) {
+                unsigned char val = fifo->FIFO[fifo->start];
+                fifo->start = (fifo->start + 1) % 16;
+                fifo->size--;
+                return val;
+        }
+        return 0xFF;
 }
 
 void push_pixel() {
         unsigned char bg_pix, sprite_pix, color;
         bg_pix = FIFO_pop(&gpu.bg_FIFO);
-        // sprite_pix = FIFO_pop(&gpu.sprite_FIFO);
-        // for rn, ignore sprite_pix
-        color = gpu.bg_pal >> (bg_pix * 2);
-        color &= 3;
-        // printf("%d", color);
-        pixels[(gpu.line * 160) + gpu.xpos] = PAL[color];
+        if (bg_pix != 0xFF) {
+                // sprite_pix = FIFO_pop(&gpu.sprite_FIFO);
+                // for rn, ignore sprite_pix
+                color = gpu.bg_pal >> (bg_pix * 2);
+                color &= 3;
+                // printf("%d", color);
+                pixels[(gpu.line * 160) + gpu.xpos] = PAL[color];
+                gpu.xpos++;
+        }
 }
