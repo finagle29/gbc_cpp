@@ -345,10 +345,16 @@ void gpu_tick() {
 void gpu_step() {
         unsigned char i;
         unsigned char time_to_consume = z80.t;
+        unsigned short dma_base;
 
         if (gpu.do_DMA) {
+                dma_base = (unsigned short)(gpu.DMA << 8);
+                if (dma_base >= 0xE000) {
+                        // read from WRAM
+                        dma_base -= 0x2000;
+                }
                 for (i = 0; i < z80.m; i++) {
-                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
+                        gpu.oam[gpu.DMA_ptr] = rb(dma_base + gpu.DMA_ptr);
                         gpu.DMA_ptr++;
                         if (gpu.DMA_ptr >= 0xA0) {
                                 gpu.do_DMA = false;

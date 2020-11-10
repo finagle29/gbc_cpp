@@ -28,7 +28,8 @@ void Gb_Apu_osc_output_3(Gb_Apu* g, int index, Blip_Buffer* center,
                 Blip_Buffer* left, Blip_Buffer* right);
 
 enum {Gb_Apu_start_addr = 0xff10};
-enum {Gb_Apu_end_addr = 0xff3f};
+// enum {Gb_Apu_end_addr = 0xff3f};
+enum {Gb_Apu_end_addr = 0xff26};
 enum {Gb_Apu_register_count = Gb_Apu_end_addr - Gb_Apu_start_addr + 1};
 
 void Gb_Apu_write_register(Gb_Apu* g, gb_time_t cpu_time, gb_addr_t addr,

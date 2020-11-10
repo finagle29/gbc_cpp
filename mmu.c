@@ -207,7 +207,9 @@ unsigned char rb(unsigned short addr) {
                                         } else {
                                         switch (addr) {
                                         case 0xFF00:
-                                                return key.rows[key.column];
+                                                return 0xC0 | key.rows[key.column];
+                                        case 0xFF02:
+                                                return 0x7E; // unimplemented serial read
                                         case 0xFF04:
                                                 return z80_p->clock.div;
                                         case 0xFF05:
@@ -215,13 +217,13 @@ unsigned char rb(unsigned short addr) {
                                         case 0xFF06:
                                                 return z80_p->clock.tma;
                                         case 0xFF07:
-                                                return z80_p->clock.tac;
+                                                return 0xF8 | z80_p->clock.tac;
                                         case 0xFF0F:
-                                                return z80_p->int_f;
+                                                return 0xE0 | z80_p->int_f;
                                         case 0xFF40:
                                                 return gpu.gpu_ctrl;
                                         case 0xFF41:
-                                                return gpu.gpu_stat;
+                                                return 0x80 | gpu.gpu_stat;
                                         case 0xFF42:
                                                 return gpu.scrollY;
                                         case 0xFF43:
@@ -245,7 +247,7 @@ unsigned char rb(unsigned short addr) {
                                         case 0xFFFF:
                                                 return z80_p->int_en;
                                         default:
-                                                return mmu->io[addr & 0x7F];
+                                                return 0xFF; // mmu->io[addr & 0x7F];
                                                 /* TODO: handle I/O */
                                         }
                                         }

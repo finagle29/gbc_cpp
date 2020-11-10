@@ -56,10 +56,7 @@ mem_oam.gb
 reg_f.gb
 	passed
 unused_hwio-GS.gb
-	failed at $FF00
-	wrote 		0x1111 1111
-	expected	0b11
-	got			0b00
+	passed
 
 mooneye-gb_hwtests/acceptance/instr
 daa.gb
@@ -68,3 +65,47 @@ daa.gb
 mooneye-gb_hwtests/acceptance/interrupts
 ie_push.gb
 	R1: not cancelled
+
+mooneye-gb_hwtests/acceptance
+	I think all other tests require M-cycle accuracy wrt memory reads, so punting on that for now
+add_sp_e_timing.gb
+boot_div-dmgABCmgb.gb
+boot_hwio-dmgABCmgb.gb
+boot_regs-dmgABC.gb
+	passed
+call_cc_timing.gb
+call_cc_timing2.gb
+call_timing.gb
+call_timing2.gb
+di_timing-GS.gb
+	FAIL ROUND 1
+div_timing.gb
+ei_sequence.gb
+	passed
+ei_timing.gb
+	passed
+halt_ime0_ei.gb
+	passed
+halt_ime0_nointr_timing.gb
+halt_ime1_timing.gb
+	passed
+halt_ime1_timing2-GS.gb
+if_ie_registers.gb
+	passed
+intr_timing.gb
+jp_cc_timing.gb
+jp_timing.gb
+ld_hl_sp_e_timing.gb
+oam_dma_restart.gb
+oam_dma_start.gb
+oam_dma_timing.gb
+pop_timing.gb
+push_timing.gb
+rapid_di_ei.gb
+	passed
+ret_cc_timing.gb
+ret_timing.gb
+reti_intr_timing.gb
+	passed
+reti_timing.gb
+rst_timing.gb
