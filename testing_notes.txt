@@ -48,7 +48,7 @@ basic.gb
 reg_read.gb
 	passed
 sources-GS.gb
-	Fail: $FE00
+	passed
 
 mooneye-gb_hwtests/acceptance/bits
 mem_oam.gb
