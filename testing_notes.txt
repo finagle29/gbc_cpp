@@ -109,3 +109,22 @@ reti_intr_timing.gb
 	passed
 reti_timing.gb
 rst_timing.gb
+
+mooneye-gb_hwtests/emulator_only/mbc1
+bits_bank1.gb
+	passed
+bits_bank2.gb
+	passed
+bits_mode.gb
+	passed
+bits_ramg.gb
+	passed
+multicart_rom_8Mb.gb
+	skipped
+ram_256kb.gb
+	passed
+ram_64kb.gb
+	passed
+rom_16Mb.gb
+	passed
+rom_1Mb.gb

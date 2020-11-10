@@ -59,6 +59,7 @@ void load_rom(char* fname) {
 
         fseek(f, 0, SEEK_END);
         rom_size = (unsigned long)ftell(f);
+        printf("ROM SIZE: %lu\n", rom_size);
         mmu = (mmu_type *)malloc(sizeof(mmu_type) + rom_size);
         
         fseek(f, 0x147, SEEK_SET);
@@ -79,6 +80,32 @@ void load_rom(char* fname) {
         }
         printf("using mbc%d\n", mmu->mbc);
 
+        fseek(f, 0x148, SEEK_SET);
+        unsigned char rom_size_byte = fgetc(f);
+        printf("ROM SIZE byte: %d", rom_size_byte);
+        if (rom_size_byte < 0x52) {
+                mmu->rom_banks = 1 << (2 * rom_size_byte);
+        } else {
+                mmu->rom_banks = 72 + 4 * (rom_size_byte - 0x52) * (rom_size_byte - 0x52 + 1);
+        }
+
+        fseek(f, 0x149, SEEK_SET);
+        unsigned char ram_size_byte = fgetc(f);
+        switch (ram_size_byte) {
+                case 0x00: case 0x01: case 0x02:
+                        mmu->ram_banks = 1;
+                        break;
+                case 0x03:
+                        mmu->ram_banks = 4;
+                        break;
+                case 0x04:
+                        mmu->ram_banks = 16;
+                        break;
+                case 0x05:
+                        mmu->ram_banks = 8;
+                        break;
+
+        }
         rewind(f);
 
         mmu->mode = 0;
@@ -120,16 +147,21 @@ void load_rom(char* fname) {
 }
 
 unsigned char rb(unsigned short addr) {
+        unsigned char effective_rom_bank;
         switch (addr & 0xF000) {
                 /* BIOS (256b) or ROM0 */
                 case 0x0000:
                         if (mmu->inbios)
                                 if (addr < 0x0100)
                                         return mmu->bios[addr];
-                        return mmu->rom[addr];
                 case 0x1000:
                 case 0x2000:
                 case 0x3000:
+                        if ((mmu->mbc == 1) && (mmu->mode == 1)) {
+                                effective_rom_bank = ((mmu->rom_bank >> 5) << 5) % mmu->rom_banks;
+                                printf("using effective rom bank %d\n", effective_rom_bank);
+                                return mmu->rom[effective_rom_bank * 0x4000 + addr];
+                        }
                         return mmu->rom[addr];
 
                 /* ROM1 (banked) (16k) */
@@ -149,6 +181,9 @@ unsigned char rb(unsigned short addr) {
                 case 0xA000:
                 case 0xB000:
                         if (mmu->eram_enable) {
+                                if ((mmu->mbc == 1) && (mmu->mode == 0)) {
+                                        return mmu->eram[addr & 0x1FFF];
+                                }
                                 if (mmu->mbc == 3) {
                                         switch (mmu->ram_bank)
                                         {
@@ -276,6 +311,9 @@ void wb(unsigned short addr, unsigned char val) {
                                 mmu->eram_enable = ((val & 0x0F) == 0x0A);
                                 if (!mmu->eram_enable) {
                                         save_sram();
+                                        printf("SRAM disabled\n");
+                                } else {
+                                        printf("SRAM enabled\n");
                                 }
                         } else if ((mmu->mbc == 2) && ((addr & 0x100) == 0)) {
                                 mmu->eram_enable = ((val & 0x0F) == 0x0A);
@@ -287,7 +325,11 @@ void wb(unsigned short addr, unsigned char val) {
                 case 0x2000:
                 case 0x3000:
                         if (mmu->mbc == 1) {
-                                mmu->rom_bank = (mmu->rom_bank & ~0x1F) | ((val ? val : val + 1) & 0x1F);
+                                mmu->rom_bank = ((mmu->rom_bank & ~0x1F) | ((val ? val : val + 1) & 0x1F)) % mmu->rom_banks;
+                                if ((mmu->rom_bank & 0x1F) == 0) {
+                                        mmu->rom_bank = (mmu->rom_bank & ~0x1F) + 1;
+                                }
+                                printf("MBC1 ROM BANK %d selected\n", mmu->rom_bank);
                         } else if (mmu->mbc == 3) {
                                 mmu->rom_bank = (val ? val : val + 1)  & 0x7F;
                         } else if (mmu->mbc == 2 && (addr & 0x100)) {
@@ -300,10 +342,14 @@ void wb(unsigned short addr, unsigned char val) {
                 case 0x5000:
                         if (mmu->mbc == 1) {
                                 if (mmu->mode) {
-                                        mmu->ram_bank = val & 0x3;
-                                } else {
-                                        mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 0x3) << 5));
+                                        mmu->ram_bank = (val & 0x3) % mmu->ram_banks;
+                                        printf("MBC1 MODE 1 RAM BANK %d selected\n", mmu->ram_bank);
                                 }
+                                mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 0x3) << 5)) % mmu->rom_banks;
+                                if ((mmu->rom_bank & 0x1F) == 0) {
+                                        mmu->rom_bank = (mmu->rom_bank & ~0x1F) + 1;
+                                }
+                                printf("MBC1 MODE 0 ROM BANK %d selected\n", mmu->rom_bank);
                         } else if (mmu->mbc == 3) {
                                 mmu->ram_bank = val & 0x7;
                         }
@@ -312,10 +358,13 @@ void wb(unsigned short addr, unsigned char val) {
                 case 0x7000:
                         if (mmu->mbc == 1) {
                                 mmu->mode = val & 1; // MBC 1
+                                printf("MBC 1 MODE %d\n", mmu->mode);
                                 if (mmu->mode) {
                                         mmu->rom_bank &= 0x1F;
+                                        printf("MBC1 MODE 1 ROM BANK %d\n", mmu->rom_bank);
                                 } else {
-                                        mmu->ram_bank = 0;
+                                        // mmu->ram_bank = 0;
+                                        printf("MBC1 MODE 0 IGNORING RAM BANK");
                                 }
                         } else if (mmu->mbc == 3) {
                                 if ((mmu->rtc.last_latch_write == 0) && (val == 1)) {
@@ -357,6 +406,13 @@ void wb(unsigned short addr, unsigned char val) {
                 /* External RAM (8k) */
                 case 0xA000:
                 case 0xB000:
+                        if (!mmu->eram_enable) {
+                                return;
+                        }
+                        if ((mmu->mbc == 1) && (mmu->mode == 0)) {
+                                mmu->eram[addr & 0x1FFF] = val;
+                                return;
+                        }
                         if (mmu->mbc == 3) {
                                 switch (mmu->ram_bank)
                                 {
