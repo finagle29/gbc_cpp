@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.5.0)
 project(gbc_cpp VERSION 0.1.0)
 
 include(CTest)
@@ -7,7 +7,7 @@ enable_testing()
 find_package(SDL2)
 find_package(Boost)
 
-string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
+string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 message ([STATUS] "SDL2_INCLUDE_DIRS" ${SDL2_INCLUDE_DIRS})
 message ([STATUS] "SDL2_LIBRARIES" ${SDL2_LIBRARIES})
 message ([STATUS] "Boost_INCLUDE_DIRS" ${Boost_INCLUDE_DIRS})
@@ -18,6 +18,7 @@ include_directories(gbc_cpp ${SDL2_INCLUDE_DIRS})
 target_link_libraries(gbc_cpp ${SDL2_LIBRARIES})
 include_directories(gbc_cpp ${Boost_INCLUDE_DIRS})
 
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -g3 -fsanitize=address -fsanitize=undefined")
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
