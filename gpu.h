@@ -2,6 +2,7 @@
 #define GPU_H
 
 #include <stdbool.h>
+#include <SDL.h>
 
 #define GPU_BG GET_BIT(gpu.gpu_ctrl, 0)
 #define GPU_SPR GET_BIT(gpu.gpu_ctrl, 1)
@@ -18,7 +19,8 @@ void dump_vram(void);
 void showTileSet(void);
 void showBGMap(void);
 
-typedef struct {
+typedef struct
+{
         unsigned char oam[0xA0];
         unsigned char vram[0x2000];
 
@@ -28,21 +30,24 @@ typedef struct {
         unsigned char line, lineYC;
         unsigned char DMA, DMA_ptr;
         unsigned short mode_clock;
-        bool do_DMA;
+        bool do_DMA, window_YC;
         unsigned char bg_pal, ob_pal0, ob_pal1;
-        unsigned char wdow_y, wdow_x;
+        unsigned char wdow_y, wdow_x, wdow_row;
+        unsigned char num_sprites;
+        unsigned char sprites[10];
 
         unsigned char tileset[384][8][8];
 } gpu_type;
 
 extern gpu_type gpu;
 
+SDL_Window *window, *vram_w, *bg_w;
+SDL_Renderer *renderer, *vram_r, *bg_r;
+SDL_Texture *framebuffer, *framebuffer_tileset, *framebuffer_bgmap;
+
 void setup(bool, bool);
 void cleanup(void);
 
 void gpu_step(void);
-
-
-
 
 #endif
