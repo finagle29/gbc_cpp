@@ -1,3 +1,38 @@
+New version (audio sync, commit 0b6c948)
+
+Within audio_callback:
+fetch_dispatch_execute: 84.9%
+gpu_step: 60.5%
+renderscan: 19.6%
+SDL_RenderPresent_REAL: 7.5%
+SDL_UpdateTexture_REAL: 6.8%
+scan_oam: 2.0%
+SDL_RenderCopy_REAL: 0.4%
+
+update_clock: 2.6%
+rb: 2.3%
+
+Multi_Buffer_read_samples: 7.3%
+Gb_Apu_end_frame: 1.8%
+Multi_Buffer_end_frame: 0.1%
+
+
+
+New version (persistent textures, commit 9c5d43f)
+
+Within frame:
+gpu_step: 61.7%
+renderscan: 16.5%
+SDL_UpdateTexture_REAL: 7.0%
+SDL_RenderPresent_REAL: 6.5%
+
+LDH_A_n: 5.2%
+rb: 5.0%
+
+update_clock: 3.0%
+
+rb: 1.6%
+
 New version (commit 310be29) (pixel framebuffer, copy to SDL texture once per frame and then render)
 
 Within frame:
