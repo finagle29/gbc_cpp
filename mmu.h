@@ -17,7 +17,8 @@ unsigned short rw(unsigned short addr);
 void wb(unsigned short addr, unsigned char val);
 void ww(unsigned short addr, unsigned short val);
 
-typedef struct {
+typedef struct
+{
         unsigned char last_latch_write;
         unsigned char seconds;
         unsigned char minutes;
@@ -26,12 +27,14 @@ typedef struct {
         bool halt_flag, day_counter_carry;
 } rtc_type;
 
-typedef struct {
+typedef struct
+{
         bool inbios, eram_enable;
-
-        unsigned char rom_bank, ram_bank;
+        unsigned short rom_bank, rom_bank_mask;
+        unsigned char ram_bank, ram_bank_mask;
         unsigned char mode, mbc; // mode = 0 means MBC1 is 16/8
                                  // mode = 1 means MBC1 is 4/32
+        // unsigned char serial;
         rtc_type rtc;
 
         unsigned char bios[0x100];
@@ -45,6 +48,6 @@ typedef struct {
 
 extern mmu_type *mmu;
 
-extern char save_fname[50];
+extern char save_fname[256];
 
 #endif
