@@ -68,19 +68,165 @@ ie_push.gb
 
 
 mooneye-bg_hwtests/emulator_only/mbc1
-bits all pass
-ram_256kb.gb
-	failed: round 3
-ram_64kb.gb
-	passed
-roms fail
+all tests pass
+
+mooneye-bg_hwtests/emulator_only/mbc2
+all tests pass
 
 mooneye-bg_hwtests/emulator_only/mbc5
-rom_1Mb.gb
-	passed
-rom_2Mb.gb
-	passed
+all tests pass
+
+mooneye-gb_hwtests/acceptance/ppu
+hblank_ly_scx_timing-GS.gb
+	test failed
+intr_1_2_timing-GS.gb
+	assertions:
+		D: 14! (00)
+		E: 15! (00)
+intr_2_0_timing.gb
+	assertions:
+		D: 07! (08)
+		E: OK
+intr_2_mode0_timing.gb
+	assertions:
+		D: 01! (02)
+		E: OK
+intr_2_mode0_timing_sprites.gb
+	test #00 failed
+intr_2_mode3_timing.gb
+	assertions:
+		D: 01! (02)
+		E: OK
+intr_2_oam_ok_timing.gb
+	assertions:
+		D: 01! (02)
+		E: OK
+lcdon_timing-GS.gb
+	test failed: LY
+	cycle: $00
+	expected: $00
+	actual: $90
+lcdon_write_timing-GS.gb
+	test failed: OAM write
+	cycle: $12
+	expected: $00
+	actual: $81
+stat_irq_blocking.gb
+	failed
+stat_lyc_onoff.gb
+	fail: r1 step 1
+vblank_stat_intr-GS.gb
+	assertions:
+		B: 01! (11)
+		C: 00! (11)
+		D: 01! (00)
+		E: OK
+
+mooneye-gb_hwtests/acceptance/serial
+boot_sclk_align-dmgABCmgb.gb
+	no serial intr
 
 mooneye-gb_hwtests/acceptance
+add_sp_e_timing.gb
+	assertions:
+		B: FF! (00)
+		C: FD! (40)
+		D: OK
+		E: OK
+boot_div-dmgABCmgb.gb
+	assertions:
+		B: AC! (92)
+		C: AD! (93)
+		D: AD! (94)
+		E: AE! (95)
+		H: AF! (96)
+		L: B1! (97)
+boot_hwio-dmgABCmgb.gb
+	mismatch at $FF00
+	expected CF
+	got C0
 boot_regs-dmgABC.gb
 	passed
+call_cc_timing.gb
+	fail: round 1
+call_cc_timing2.gb
+	assertions:
+		B: 81! (FF)
+		C: 81! (9D)
+		D: 81! (FF)
+		E: OK
+		H: OK
+		L: OK
+di_timing-GS.gb
+	fail: round 1
+div_timing.gb
+	passed
+ei_sequence.gb
+	passed
+ei_timing.gb
+	passed
+halt_ime0_ei.gb
+	passed
+halt_ime0_nointr_timing.gb
+	assertions:
+		D: 11! (12)
+		E: OK
+halt_ime1_timing.gb
+	passed
+halt_ime1_timing2-GS.gb
+	fail: round 1
+if_ie_registers.gb
+	passed
+intr_timing.gb
+	assertions:
+		D: OK
+		E: 01! (00)
+jp_cc_timing.gb
+	fail: round 1
+jp_timing.gb
+	fail: round 1
+ld_hl_sp_e_timing.gb
+	assertions:
+		B: CF! (D0)
+		C: FE! (41)
+		D: OK
+		E: OK
+oam_dma_restart.gb
+	assertions:
+		C: FF! (01)
+		D: OK
+oam_dma_start.gb
+	fail: round 1 rst $10
+oam_dma_timing.gb
+	assertions:
+		C: FF! (01)
+		D: OK
+pop_timing.gb
+	assertions:
+		A: OK
+		B: OK
+		C: OK
+		D: OK
+		E: 01! (00)
+push_timing.gb
+	assertions:
+		D: 81! (42)
+		E: OK
+		H: OK
+		L: OK
+rapid_di_ei.gb
+	passed
+ret_cc_timing.gb
+	fail: round 1
+ret_timing.gb
+	fail: round 1
+reti_intr_timing.gb
+	passed
+reti_timing.gb
+	fail: round 1
+rst_timing.gb
+	assertions:
+		B: 81! (FF)
+		C: OK
+		D: OK
+		E: OK

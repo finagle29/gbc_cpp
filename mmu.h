@@ -31,7 +31,7 @@ typedef struct
 
 typedef struct
 {
-        bool inbios, eram_enable;
+        bool inbios, eram_enable, mbc1m;
         unsigned short rom_bank, rom_bank_mask;
         unsigned char ram_bank, ram_bank_mask;
         unsigned char mode, mbc; // mode = 0 means MBC1 is 16/8

@@ -159,8 +159,20 @@ void load_rom(char *fname)
         printf("rom banking mask: %02x\n", mmu->rom_bank_mask);
         printf("ram banking mask: %02x\n", mmu->ram_bank_mask);
 
-        rewind(f);
+        // check for MBC1M
+        mmu->mbc1m = false;
+        if ((rom_size >= 0x40104) && (mmu->mbc == 1))
+        {
+                fseek(f, 0x40104, SEEK_SET);
+                if ((fgetc(f) == 0xCE) && (fgetc(f) == 0xED) && (fgetc(f) == 0x66) && (fgetc(f) == 0x66))
+                {
+                        // MBC1M mode
+                        mmu->mbc1m = true;
+                        printf("MBC1M detected\n");
+                }
+        }
 
+        rewind(f);
         mmu->mode = 0;
 
         if (mmu == NULL)
@@ -202,6 +214,7 @@ void load_rom(char *fname)
         memset(mmu->wram, 0, 0x2000);
         memset(mmu->zram, 0, 0x80);
         memset(mmu->io, 0, 0x80);
+
         // mmu->serial = 0;
         // Need to handle RTC save from file
 }
@@ -222,8 +235,11 @@ unsigned char rb(unsigned short addr)
                 {
                         if (mmu->mode == 1)
                         {
-                                return mmu->rom[(((mmu->ram_bank << 5) & mmu->rom_bank_mask) | (mmu->rom_bank & 0x60)) * 0x4000 + addr];
-                                // return mmu->rom[(mmu->ram_bank << 5) * 0x4000 + addr];
+                                if (mmu->mbc1m)
+                                {
+                                        return mmu->rom[(mmu->rom_bank & 0x30) * 0x4000 + addr];
+                                }
+                                return mmu->rom[(mmu->rom_bank & 0x60) * 0x4000 + addr];
                         }
                 }
                 return mmu->rom[addr];
@@ -472,11 +488,20 @@ void wb(unsigned short addr, unsigned char val)
                 // printf("(%04x) <- %02x\n", addr, val);
                 if (mmu->mbc == 1)
                 {
-                        mmu->rom_bank = (((val & 0x1F) ? val : val + 1) & 0x1F) | (mmu->rom_bank & 0x60);
+                        if (mmu->mbc1m)
+                        {
+                                mmu->rom_bank = ((val & 0x1F) ? (val & 0xF) : val + 1) | (mmu->rom_bank & 0x30);
+                        }
+                        else
+                        {
+
+                                mmu->rom_bank = (((val & 0x1F) ? val : val + 1) & 0x1F) | (mmu->rom_bank & 0x60);
+                        }
+                        // mmu->rom_bank = (((val & 0x1F) ? val : val + 1) & mmu->rom_bank_mask) | (mmu->rom_bank & 0x60);
                 }
                 else if (mmu->mbc == 3)
                 {
-                        mmu->rom_bank = (val ? val : val + 1) & 0x7F;
+                        mmu->rom_bank = ((val & 0x7F) ? val : val + 1) & 0x7F;
                 }
                 else if (mmu->mbc == 2)
                 {
@@ -514,8 +539,16 @@ void wb(unsigned short addr, unsigned char val)
                         {
                                 mmu->ram_bank = val & 3;
                         }
-                        mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 3) << 5));
-                        mmu->rom_bank &= mmu->rom_bank_mask;
+                        if (mmu->mbc1m)
+                        {
+                                mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0xF) | ((val & 3) << 4));
+                                mmu->rom_bank &= mmu->rom_bank_mask;
+                        }
+                        else
+                        {
+                                mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 3) << 5));
+                                mmu->rom_bank &= mmu->rom_bank_mask;
+                        }
                 }
                 else if (mmu->mbc == 3)
                 {
@@ -616,6 +649,11 @@ void wb(unsigned short addr, unsigned char val)
                         if (mmu->mbc == 2)
                         {
                                 mmu->eram[addr & 0x1FF] = (val | 0xF0);
+                                break;
+                        }
+                        else if ((mmu->mbc == 1) && (mmu->mode == 0))
+                        {
+                                mmu->eram[addr & 0x1FFF] = val;
                                 break;
                         }
                         mmu->eram[mmu->ram_bank * 0x2000 + (addr & 0x1FFF)] = val;
