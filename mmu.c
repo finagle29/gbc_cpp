@@ -39,6 +39,7 @@ void save_sram()
         printf("saving to %s\n", save_fname);
         FILE *f = fopen(save_fname, "w+b");
         fwrite(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
+        fwrite(&mmu->rtc, sizeof(rtc_type), 1, f);
         fclose(f);
 }
 
@@ -174,12 +175,16 @@ void load_rom(char *fname)
         fread(mmu->rom, sizeof(unsigned char), rom_size, f);
         fclose(f);
 
+        mmu->rtc = (rtc_type){};
+        mmu->rtc_latched = (rtc_type){};
+
         if (stat(save_fname, &buffer) == 0)
         {
                 printf("reading save file %s ...\n", save_fname);
                 f = fopen(save_fname, "rb");
                 size_t result = fread(mmu->eram, sizeof(unsigned char), sizeof(mmu->eram), f);
                 printf("read %lu bytes\n", result);
+                result = fread(&mmu->rtc, sizeof(rtc_type), 1, f);
                 fclose(f);
         }
         else
@@ -217,7 +222,7 @@ unsigned char rb(unsigned short addr)
                 {
                         if (mmu->mode == 1)
                         {
-                                return mmu->rom[((mmu->ram_bank << 5) & mmu->rom_bank_mask) * 0x4000 + addr];
+                                return mmu->rom[(((mmu->ram_bank << 5) & mmu->rom_bank_mask) | (mmu->rom_bank & 0x60)) * 0x4000 + addr];
                                 // return mmu->rom[(mmu->ram_bank << 5) * 0x4000 + addr];
                         }
                 }
@@ -247,17 +252,17 @@ unsigned char rb(unsigned short addr)
                                 switch (mmu->ram_bank)
                                 {
                                 case 0x8:
-                                        return mmu->rtc.seconds;
+                                        return mmu->rtc_latched.seconds;
                                 case 0x9:
-                                        return mmu->rtc.minutes;
+                                        return mmu->rtc_latched.minutes;
                                 case 0xA:
-                                        return mmu->rtc.hours;
+                                        return mmu->rtc_latched.hours;
                                 case 0xB:
-                                        return mmu->rtc.day_counter & 0xFF;
+                                        return mmu->rtc_latched.day_counter & 0xFF;
                                 case 0xC:
-                                        return (mmu->rtc.halt_flag << 6) |
-                                               (mmu->rtc.day_counter_carry << 7) |
-                                               GET_BIT(mmu->rtc.day_counter, 8);
+                                        return (mmu->rtc_latched.halt_flag << 6) |
+                                               (mmu->rtc_latched.day_counter_carry << 7) |
+                                               GET_BIT(mmu->rtc_latched.day_counter, 8);
                                 }
                         }
                         if (mmu->mbc == 1)
@@ -270,6 +275,10 @@ unsigned char rb(unsigned short addr)
                                 {
                                         return mmu->eram[addr & 0x1FFF];
                                 }
+                        }
+                        if (mmu->mbc == 2)
+                        {
+                                return mmu->eram[addr & 0x1FF];
                         }
                         return mmu->eram[(mmu->ram_bank & mmu->ram_bank_mask) * 0x2000 + (addr & 0x1FFF)];
                 }
@@ -431,14 +440,7 @@ void wb(unsigned short addr, unsigned char val)
                         // {
                         //         save_sram();
                         // }
-                }
-                else if ((mmu->mbc == 2) && ((addr & 0x100) == 0))
-                {
-                        mmu->eram_enable = ((val & 0x0F) == 0x0A);
-                        if (!mmu->eram_enable)
-                        {
-                                save_sram();
-                        }
+                        break;
                 }
                 else if (mmu->mbc == 5)
                 {
@@ -454,8 +456,9 @@ void wb(unsigned short addr, unsigned char val)
                         {
                                 mmu->eram_enable = (val == 0x0A);
                         }
+                        break;
                 }
-                break;
+
         /* BANK1 / ROMB0 */
         case 0x2000:
                 if (mmu->mbc == 5)
@@ -469,15 +472,28 @@ void wb(unsigned short addr, unsigned char val)
                 // printf("(%04x) <- %02x\n", addr, val);
                 if (mmu->mbc == 1)
                 {
-                        mmu->rom_bank = ((val ? val : val + 1) & 0x1F) | (mmu->rom_bank & 0x60);
+                        mmu->rom_bank = (((val & 0x1F) ? val : val + 1) & 0x1F) | (mmu->rom_bank & 0x60);
                 }
                 else if (mmu->mbc == 3)
                 {
                         mmu->rom_bank = (val ? val : val + 1) & 0x7F;
                 }
-                else if (mmu->mbc == 2 && (addr & 0x100))
+                else if (mmu->mbc == 2)
                 {
-                        mmu->rom_bank = val & 0x0F;
+                        if ((addr & 0x100) == 0)
+                        {
+                                {
+                                        mmu->eram_enable = ((val & 0xF) == 0xA);
+                                        if (!mmu->eram_enable)
+                                        {
+                                                save_sram();
+                                        }
+                                }
+                        }
+                        else
+                        {
+                                mmu->rom_bank = ((val & 0xF) ? val : val + 1) & 0xF;
+                        }
                 }
                 else if (mmu->mbc == 5)
                 {
@@ -498,11 +514,8 @@ void wb(unsigned short addr, unsigned char val)
                         {
                                 mmu->ram_bank = val & 3;
                         }
-                        else
-                        {
-                                mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 3) << 5));
-                                mmu->rom_bank &= mmu->rom_bank_mask;
-                        }
+                        mmu->rom_bank = (unsigned char)((mmu->rom_bank & 0x1F) | ((val & 3) << 5));
+                        mmu->rom_bank &= mmu->rom_bank_mask;
                 }
                 else if (mmu->mbc == 3)
                 {
@@ -513,13 +526,13 @@ void wb(unsigned short addr, unsigned char val)
                 {
                         mmu->ram_bank = val & 0xF;
                 }
-                mmu->ram_bank &= mmu->ram_bank_mask;
+                // mmu->ram_bank &= mmu->ram_bank_mask;
                 // printf("ROM bank: %02x\n", mmu->rom_bank);
                 // printf("RAM bank: %02x\n", mmu->ram_bank);
                 break;
         case 0x6000:
         case 0x7000:
-                printf("(%04x) <- %02x\n", addr, val);
+                // printf("(%04x) <- %02x\n", addr, val);
                 if (mmu->mbc == 1)
                 {
                         mmu->mode = val & 1; // MBC 1
@@ -533,17 +546,17 @@ void wb(unsigned short addr, unsigned char val)
                 {
                         if ((mmu->rtc.last_latch_write == 0) && (val == 1))
                         {
-                                time_t rawtime;
-                                struct tm *timeinfo;
 
-                                time(&rawtime);
-                                timeinfo = localtime(&rawtime);
+                                mmu->rtc_latched.seconds = mmu->rtc.seconds;
+                                mmu->rtc_latched.minutes = mmu->rtc.minutes;
+                                mmu->rtc_latched.hours = mmu->rtc.hours;
+                                mmu->rtc_latched.day_counter = mmu->rtc.day_counter;
+                                mmu->rtc_latched.day_counter_carry = mmu->rtc.day_counter_carry;
+                                mmu->rtc_latched.halt_flag = mmu->rtc.halt_flag;
 
-                                mmu->rtc.seconds = timeinfo->tm_sec;
-                                mmu->rtc.minutes = timeinfo->tm_min;
-                                mmu->rtc.hours = timeinfo->tm_hour;
-                                mmu->rtc.day_counter = timeinfo->tm_yday;
-                                printf("latched RTC\n");
+                                // printf("latched RTC\n");
+                                // printf("%03d %02d:%02d:%02d\n", mmu->rtc_latched.day_counter, mmu->rtc_latched.hours,
+                                //        mmu->rtc_latched.minutes, mmu->rtc_latched.seconds);
                         }
                         mmu->rtc.last_latch_write = val;
                 }
@@ -579,16 +592,17 @@ void wb(unsigned short addr, unsigned char val)
                         switch (mmu->ram_bank)
                         {
                         case 0x8:
-                                mmu->rtc.seconds = val;
+                                mmu->rtc.seconds = val & 0x3F;
+                                mmu->rtc.ticks = 0;
                                 return;
                         case 0x9:
-                                mmu->rtc.minutes = val;
+                                mmu->rtc.minutes = val & 0x3F;
                                 return;
                         case 0xA:
-                                mmu->rtc.hours = val;
+                                mmu->rtc.hours = val & 0x1F;
                                 return;
                         case 0xB:
-                                mmu->rtc.day_counter = (mmu->rtc.day_counter & 0x100) | val;
+                                mmu->rtc.day_counter = (mmu->rtc.day_counter & 0x100) | (val & 0xFF);
                                 return;
                         case 0xC:
                                 mmu->rtc.day_counter = (mmu->rtc.day_counter & 0xFF) | ((val & 1) << 8);
@@ -599,6 +613,11 @@ void wb(unsigned short addr, unsigned char val)
                 }
                 if (mmu->eram_enable)
                 {
+                        if (mmu->mbc == 2)
+                        {
+                                mmu->eram[addr & 0x1FF] = (val | 0xF0);
+                                break;
+                        }
                         mmu->eram[mmu->ram_bank * 0x2000 + (addr & 0x1FFF)] = val;
                 }
                 break;

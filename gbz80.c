@@ -5,321 +5,403 @@
 #include "mmu.h"
 #include "gpu.h"
 
-gbz80_type z80 = {.af = 0, .bc = 0, .de = 0, .hl = 0,
-        .sp = 0, .pc = 0, .m = 0, .t = 0,
-        .halt = false, .stop = false, .ime = false, .new_ime = false,
-        .int_f = 0, .int_en = 0, .clock = { .m = 0,
-        .tima = 0, .tma = 0, .tac = 0, .old_tac = 0}}, *z80_p;
+gbz80_type z80 = {.af = 0, .bc = 0, .de = 0, .hl = 0, .sp = 0, .pc = 0, .m = 0, .t = 0, .halt = false, .stop = false, .ime = false, .new_ime = false, .int_f = 0, .int_en = 0, .clock = {.m = 0, .tima = 0, .tma = 0, .tac = 0, .old_tac = 0}}, *z80_p;
 
 static unsigned char op;
 void printerr(unsigned char);
 
-
-void init_z80() {
+void init_z80()
+{
         z80_p = &z80;
 
         reset();
 }
 
-void scramble_z80() {
+void scramble_z80()
+{
         unsigned short addr = 0;
-        for (addr = 0; addr < 0xFFFF; addr++) {
+        for (addr = 0; addr < 0xFFFF; addr++)
+        {
                 wb(addr, (unsigned char)rand());
         }
 }
 
-void reset() {
-        z80.af = 0; z80.bc = 0;
-        z80.de = 0; z80.hl = 0;
+void reset()
+{
+        z80.af = 0;
+        z80.bc = 0;
+        z80.de = 0;
+        z80.hl = 0;
         z80.sp = 0;
         z80.pc = 0;
 
-        z80.m = 0; z80.t = 0;
+        z80.m = 0;
+        z80.t = 0;
 
         // z80.clock.m = 0; z80.clock.t = 0;
         z80.stop = z80.halt = false;
         z80.ime = false;
 }
 
-void printerr(unsigned char opcode) {
+void printerr(unsigned char opcode)
+{
         fprintf(stderr, "Oops! Something went wrong with opcode %c", opcode);
 }
 
-void fetch_dispatch_execute_loop() {
-        while (!z80.halt) {
+void fetch_dispatch_execute_loop()
+{
+        while (!z80.halt)
+        {
                 fetch_dispatch_execute();
         }
 }
 
-int fetch_dispatch_execute() {
+int fetch_dispatch_execute()
+{
 
         int cycles = 0;
 
-        if (!z80.halt) {
-        op = rb(z80.pc++);
-        unsigned char prefix = 0;
-
-        if (op == 0xCB || op == 0xDD || op == 0xED || op == 0xFD) {
-                prefix = op;
+        if (!z80.halt)
+        {
                 op = rb(z80.pc++);
-        }
+                unsigned char prefix = 0;
 
-
-
-
-        unsigned char n;
-        unsigned short nn;
-
-        unsigned char x, y, z, p, q;
-
-        x = op >> 6;
-        y = (op >> 3) & 0x7;
-        z = op & 0x7;
-        p = y >> 1;
-        q = y % 2;
-
-        if (prefix) {
-                switch (x)
+                if (op == 0xCB || op == 0xDD || op == 0xED || op == 0xFD)
                 {
+                        prefix = op;
+                        op = rb(z80.pc++);
+                }
+
+                unsigned char n;
+                unsigned short nn;
+
+                unsigned char x, y, z, p, q;
+
+                x = op >> 6;
+                y = (op >> 3) & 0x7;
+                z = op & 0x7;
+                p = y >> 1;
+                q = y % 2;
+
+                if (prefix)
+                {
+                        switch (x)
+                        {
                         case 0:
-                                if (table_r[z] == NULL) {
+                                if (table_r[z] == NULL)
+                                {
                                         table_rot_HL[y]();
-                                } else {
+                                }
+                                else
+                                {
                                         table_rot[y](table_r[z]);
                                 }
                                 break;
                         case 1:
-                                if (table_r[z] == NULL) {
+                                if (table_r[z] == NULL)
+                                {
                                         BIT_b_HL(y);
-                                } else {
+                                }
+                                else
+                                {
                                         BIT_b_r(y, *table_r[z]);
                                 }
                                 break;
                         case 2:
-                                if (table_r[z] == NULL) {
+                                if (table_r[z] == NULL)
+                                {
                                         RES_b_HL(y);
-                                } else {
+                                }
+                                else
+                                {
                                         RES_b_r(y, table_r[z]);
                                 }
                                 break;
                         case 3:
-                                if (table_r[z] == NULL) {
+                                if (table_r[z] == NULL)
+                                {
                                         SET_b_HL(y);
-                                } else {
+                                }
+                                else
+                                {
                                         SET_b_r(y, table_r[z]);
                                 }
                                 break;
                         default:
                                 printerr(op);
+                        }
                 }
-        } else {
+                else
+                {
 
-        switch (x)
-        {
-                case 0:
-                        switch (z)
+                        switch (x)
                         {
+                        case 0:
+                                switch (z)
+                                {
                                 case 0:
                                         switch (y)
                                         {
-                                                case 0:
-                                                        NOP();
-                                                        break;
-                                                case 1:
-                                                        nn = rw(z80.pc);
-                                                        z80.pc += 2;
-                                                        LD_nn_SP(nn);
-                                                        break;
-                                                case 2:
-                                                        STOP();
-                                                        break;
-                                                case 3:
-                                                        n = rb(z80.pc);
-                                                        if (n == 0xFE) {
-                                                                // IE jumping in place
-                                                                return 0;
-                                                        }
-                                                        z80.pc++;
-                                                        JR_n((signed char)n);
-                                                        break;
-                                                case 4:
-                                                case 5:
-                                                case 6:
-                                                case 7:
-                                                        n = rb(z80.pc);
-                                                        z80.pc++;
-                                                        JR_cc_n(table_cc[y-4](), (signed char)n);
-                                                        break;
-                                                default:
-                                                        printerr(op);
+                                        case 0:
+                                                NOP();
+                                                break;
+                                        case 1:
+                                                nn = rw(z80.pc);
+                                                z80.pc += 2;
+                                                LD_nn_SP(nn);
+                                                break;
+                                        case 2:
+                                                STOP();
+                                                break;
+                                        case 3:
+                                                n = rb(z80.pc);
+                                                if (n == 0xFE)
+                                                {
+                                                        // IE jumping in place
+                                                        return 0;
+                                                }
+                                                z80.pc++;
+                                                JR_n((signed char)n);
+                                                break;
+                                        case 4:
+                                        case 5:
+                                        case 6:
+                                        case 7:
+                                                n = rb(z80.pc);
+                                                z80.pc++;
+                                                JR_cc_n(table_cc[y - 4](), (signed char)n);
+                                                break;
+                                        default:
+                                                printerr(op);
                                         };
                                         break;
                                 case 1:
-                                        if (!q) {
+                                        if (!q)
+                                        {
                                                 nn = rw(z80.pc);
                                                 z80.pc += 2;
                                                 LD_n_nn(table_rp[p], nn);
-                                        } else {
+                                        }
+                                        else
+                                        {
                                                 ADD_HL_n(table_rp[p]);
                                         }
                                         break;
                                 case 2:
-                                        if (!q) {
-                                                if (p == 0) {
+                                        if (!q)
+                                        {
+                                                if (p == 0)
+                                                {
                                                         LD_wb_A(z80.bc, 2);
                                                         /* LD (BC), A */
-                                                } else if (p == 1) {
+                                                }
+                                                else if (p == 1)
+                                                {
                                                         LD_wb_A(z80.de, 2);
                                                         /* LD (DE), A */
-                                                } else if (p == 2) {
+                                                }
+                                                else if (p == 2)
+                                                {
                                                         LDI_HL_A();
-                                                } else if (p == 3) {
+                                                }
+                                                else if (p == 3)
+                                                {
                                                         LDD_HL_A();
-                                                } else { printerr(op); }
-                                        } else {
-                                                if (p == 0) {
+                                                }
+                                                else
+                                                {
+                                                        printerr(op);
+                                                }
+                                        }
+                                        else
+                                        {
+                                                if (p == 0)
+                                                {
                                                         LD_A_rb(z80.bc, 2);
-                                                } else if (p == 1) {
+                                                }
+                                                else if (p == 1)
+                                                {
                                                         LD_A_rb(z80.de, 2);
-                                                } else if (p == 2) {
+                                                }
+                                                else if (p == 2)
+                                                {
                                                         LDI_A_HL();
-                                                } else if (p == 3) {
+                                                }
+                                                else if (p == 3)
+                                                {
                                                         LDD_A_HL();
-                                                } else { printerr(op); }
+                                                }
+                                                else
+                                                {
+                                                        printerr(op);
+                                                }
                                         }
                                         break;
                                 case 3:
-                                        if (!q) {
+                                        if (!q)
+                                        {
                                                 INC_nn(table_rp[p]);
-                                        } else {
+                                        }
+                                        else
+                                        {
                                                 DEC_nn(table_rp[p]);
                                         }
                                         break;
                                 case 4:
-                                        if (table_r[y] == NULL) {
+                                        if (table_r[y] == NULL)
+                                        {
                                                 INC_HL();
-                                        } else {
+                                        }
+                                        else
+                                        {
                                                 INC_n(table_r[y]);
                                         }
                                         break;
                                 case 5:
-                                        if (table_r[y] == NULL) {
+                                        if (table_r[y] == NULL)
+                                        {
                                                 DEC_HL();
-                                        } else {
+                                        }
+                                        else
+                                        {
                                                 DEC_n(table_r[y]);
                                         }
                                         break;
                                 case 6:
                                         n = rb(z80.pc);
                                         z80.pc++;
-                                        if (table_r[y] == NULL) {
+                                        if (table_r[y] == NULL)
+                                        {
                                                 LD_HL_n(n);
-                                        } else {
+                                        }
+                                        else
+                                        {
                                                 LD_nn_n(table_r[y], n);
                                         }
                                         break;
                                 case 7:
                                         switch (y)
                                         {
-                                                case 0:
-                                                        RLCA();
-                                                        break;
-                                                case 1:
-                                                        RRCA();
-                                                        break;
-                                                case 2:
-                                                        RLA();
-                                                        break;
-                                                case 3:
-                                                        RRA();
-                                                        break;
-                                                case 4:
-                                                        DAA();
-                                                        break;
-                                                case 5:
-                                                        CPL();
-                                                        break;
-                                                case 6:
-                                                        SCF();
-                                                        break;
-                                                case 7:
-                                                        CCF();
-                                                        break;
-                                                default:
-                                                        printerr(op);
+                                        case 0:
+                                                RLCA();
+                                                break;
+                                        case 1:
+                                                RRCA();
+                                                break;
+                                        case 2:
+                                                RLA();
+                                                break;
+                                        case 3:
+                                                RRA();
+                                                break;
+                                        case 4:
+                                                DAA();
+                                                break;
+                                        case 5:
+                                                CPL();
+                                                break;
+                                        case 6:
+                                                SCF();
+                                                break;
+                                        case 7:
+                                                CCF();
+                                                break;
+                                        default:
+                                                printerr(op);
                                         };
                                         break;
                                 default:
                                         printerr(op);
-                        };
-                        break;
-                case 1:
-                        if (z == 6 && y == 6) {
-                                HALT();
-                        } else {
-                                if (table_r[y] == NULL) {
-                                        LD_HL_r2(*table_r[z]);
-                                } else if (table_r[z] == NULL) {
-                                        LD_r1_r2(table_r[y], rb(z80.hl), 2);
-                                } else {
-                                        LD_r1_r2(table_r[y], *table_r[z], 1);
+                                };
+                                break;
+                        case 1:
+                                if (z == 6 && y == 6)
+                                {
+                                        HALT();
                                 }
-                        }
-                        break;
-                case 2:
-                        if (table_r[z] == NULL) {
-                                table_alu[y](rb(z80.hl), 2);
-                        } else {
-                                table_alu[y](*table_r[z], 1);
-                        }
-                        break;
-                case 3:
-                        switch (z)
-                        {
+                                else
+                                {
+                                        if (table_r[y] == NULL)
+                                        {
+                                                LD_HL_r2(*table_r[z]);
+                                        }
+                                        else if (table_r[z] == NULL)
+                                        {
+                                                LD_r1_r2(table_r[y], rb(z80.hl), 2);
+                                        }
+                                        else
+                                        {
+                                                LD_r1_r2(table_r[y], *table_r[z], 1);
+                                        }
+                                }
+                                break;
+                        case 2:
+                                if (table_r[z] == NULL)
+                                {
+                                        table_alu[y](rb(z80.hl), 2);
+                                }
+                                else
+                                {
+                                        table_alu[y](*table_r[z], 1);
+                                }
+                                break;
+                        case 3:
+                                switch (z)
+                                {
                                 case 0:
                                         switch (y)
                                         {
-                                                case 0:
-                                                case 1:
-                                                case 2:
-                                                case 3:
-                                                        RET_cc(table_cc[y]());
-                                                        break;
-                                                case 4:
-                                                        n = rb(z80.pc);
-                                                        z80.pc++;
-                                                        LDH_n_A(n);
-                                                        break;
-                                                case 5:
-                                                        n = rb(z80.pc);
-                                                        z80.pc++;
-                                                        ADD_SP_n((signed char)n);
-                                                        break;
-                                                case 6:
-                                                        n = rb(z80.pc);
-                                                        z80.pc++;
-                                                        LDH_A_n(n);
-                                                        break;
-                                                case 7:
-                                                        n = rb(z80.pc);
-                                                        z80.pc++;
-                                                        LDHL_SP_n((signed char)n);
-                                                        break;
-                                                default:
-                                                        printerr(op);
+                                        case 0:
+                                        case 1:
+                                        case 2:
+                                        case 3:
+                                                RET_cc(table_cc[y]());
+                                                break;
+                                        case 4:
+                                                n = rb(z80.pc);
+                                                z80.pc++;
+                                                LDH_n_A(n);
+                                                break;
+                                        case 5:
+                                                n = rb(z80.pc);
+                                                z80.pc++;
+                                                ADD_SP_n((signed char)n);
+                                                break;
+                                        case 6:
+                                                n = rb(z80.pc);
+                                                z80.pc++;
+                                                LDH_A_n(n);
+                                                break;
+                                        case 7:
+                                                n = rb(z80.pc);
+                                                z80.pc++;
+                                                LDHL_SP_n((signed char)n);
+                                                break;
+                                        default:
+                                                printerr(op);
                                         }
                                         break;
                                 case 1:
-                                        if (!q) {
+                                        if (!q)
+                                        {
                                                 POP_nn(table_rp2[p]);
-                                        } else {
-                                                if (p == 0) {
+                                        }
+                                        else
+                                        {
+                                                if (p == 0)
+                                                {
                                                         RET();
-                                                } else if (p == 1) {
+                                                }
+                                                else if (p == 1)
+                                                {
                                                         RETI();
-                                                } else if (p == 2) {
+                                                }
+                                                else if (p == 2)
+                                                {
                                                         JP_HL();
-                                                } else if (p == 3) {
+                                                }
+                                                else if (p == 3)
+                                                {
                                                         LD_SP_HL();
                                                 }
                                         }
@@ -327,56 +409,65 @@ int fetch_dispatch_execute() {
                                 case 2:
                                         switch (y)
                                         {
-                                                case 0:
-                                                case 1:
-                                                case 2:
-                                                case 3:
-                                                        nn = rw(z80.pc);
-                                                        z80.pc += 2;
-                                                        JP_cc_nn(table_cc[y](), nn);
-                                                        break;
-                                                case 4:
-                                                        LD_C_A();
-                                                        break;
-                                                case 5:
-                                                        nn = rw(z80.pc);
-                                                        z80.pc += 2;
-                                                        LD_wb_A(nn, 4);
-                                                        break;
-                                                case 6:
-                                                        LD_A_C();
-                                                        break;
-                                                case 7:
-                                                        nn = rw(z80.pc);
-                                                        z80.pc += 2;
-                                                        LD_A_rb(nn, 4);
-                                                        break;
-                                                default:
-                                                        printerr(op);
+                                        case 0:
+                                        case 1:
+                                        case 2:
+                                        case 3:
+                                                nn = rw(z80.pc);
+                                                z80.pc += 2;
+                                                JP_cc_nn(table_cc[y](), nn);
+                                                break;
+                                        case 4:
+                                                LD_C_A();
+                                                break;
+                                        case 5:
+                                                nn = rw(z80.pc);
+                                                z80.pc += 2;
+                                                LD_wb_A(nn, 4);
+                                                break;
+                                        case 6:
+                                                LD_A_C();
+                                                break;
+                                        case 7:
+                                                nn = rw(z80.pc);
+                                                z80.pc += 2;
+                                                LD_A_rb(nn, 4);
+                                                break;
+                                        default:
+                                                printerr(op);
                                         }
                                         break;
                                 case 3:
-                                        if (y == 0) {
+                                        if (y == 0)
+                                        {
                                                 nn = rw(z80.pc);
                                                 z80.pc += 2;
                                                 JP_nn(nn);
-                                        } else if (y == 6) {
+                                        }
+                                        else if (y == 6)
+                                        {
                                                 DI();
-                                        } else if (y == 7) {
+                                        }
+                                        else if (y == 7)
+                                        {
                                                 EI();
                                         }
                                         break;
                                 case 4:
-                                        if (y >= 0 && y <= 3) {
+                                        if (y >= 0 && y <= 3)
+                                        {
                                                 nn = rw(z80.pc);
                                                 z80.pc += 2;
                                                 CALL_cc_nn(table_cc[y](), nn);
                                         }
                                         break;
                                 case 5:
-                                        if (q == 0) {
+                                        if (q == 0)
+                                        {
                                                 PUSH_nn(table_rp2[p]);
-                                        } else if (p == 0) {
+                                        }
+                                        else if (p == 0)
+                                        {
                                                 nn = rw(z80.pc);
                                                 z80.pc += 2;
                                                 CALL_nn(nn);
@@ -388,18 +479,21 @@ int fetch_dispatch_execute() {
                                         table_alu[y](n, 2);
                                         break;
                                 case 7:
-                                        RST_n(y*8);
+                                        RST_n(y * 8);
                                         break;
                                 default:
                                         printerr(op);
+                                }
+                                break;
+                        default:
+                                printerr(op);
                         }
-                        break;
-                default:
-                        printerr(op);
+                }
         }
-        }
-        } else {
-                z80.m  = 1; z80.t = 4;
+        else
+        {
+                z80.m = 1;
+                z80.t = 4;
         }
 
         /* do other things i guess */
@@ -409,122 +503,177 @@ int fetch_dispatch_execute() {
         cycles += z80.m;
         update_clock();
         gpu_step();
+        // printf("ime: %d", z80.ime);
 
         z80.m = z80.t = 0;
 
         unsigned char ints = z80.int_en & z80.int_f & 0x1F;
 
-        if (ints) { z80.halt = false; }
-        
-        if (ints && z80.ime) {
+        if (ints)
+        {
+                z80.halt = false;
+        }
+
+        if (ints && z80.ime)
+        {
                 z80.ime = false;
                 z80.new_ime = false;
-                if (GET_BIT(ints, 0)) {
+                if (GET_BIT(ints, 0))
+                {
                         z80.int_f &= ~0x1;
                         RST40();
                         // do V-Blank
-                } else if (GET_BIT(ints, 1)) {
+                }
+                else if (GET_BIT(ints, 1))
+                {
                         z80.int_f &= ~0x2;
                         RST48();
                         // do LCD STAT
-                } else if (GET_BIT(ints, 2)) {
+                }
+                else if (GET_BIT(ints, 2))
+                {
                         z80.int_f &= ~0x4;
                         RST50();
-                } else if (GET_BIT(ints, 3)) {
+                }
+                else if (GET_BIT(ints, 3))
+                {
                         z80.int_f &= ~0x8;
                         RST58();
-                } else if (GET_BIT(ints, 4)) {
+                }
+                else if (GET_BIT(ints, 4))
+                {
                         z80.int_f &= ~0x10;
                         RST60();
+                        printf("keypad IRQ\n");
                         // handle keypad interaction
                 }
                 // z80.clock.m += z80.m;
                 // z80.clock.t += z80.t;
                 cycles += z80.m;
                 update_clock();
+                gpu_step();
         }
 
-        if (z80.new_ime) z80.ime = z80.new_ime;
+        if (z80.new_ime)
+                z80.ime = z80.new_ime;
 
         z80.clock.long_time += cycles;
         return cycles;
-
 }
 
-
-void update_clock() {
+void update_clock()
+{
         unsigned short old_m = z80.clock.m;
         unsigned short threshold = 1 << (3 + 2 * (((z80.clock.tac & 3) - 1) & 3));
 
-        if (!(z80.clock.old_tac & 4) && (z80.clock.tac & 4)) {
+        if (!(z80.clock.old_tac & 4) && (z80.clock.tac & 4))
+        {
                 z80.clock.old_tac = z80.clock.tac;
-                if ((((z80.clock.m & 0xf) + (z80.t & 0xf)) & 0x10) == 0x10) {
+                if ((((z80.clock.m & 0xf) + (z80.t & 0xf)) & 0x10) == 0x10)
+                {
                         // time till carry in
                         // use up this much time
                         z80.t -= 0x10 - (z80.clock.m & 0xF);
                         z80.clock.m += 0x10 - (z80.clock.m & 0xF);
                 }
         }
-        if (z80.clock.tac & 4) {
-                while (z80.t-- > 0) {
+        if (z80.clock.tac & 4)
+        {
+                while (z80.t-- > 0)
+                {
                         z80.clock.m++;
 
-                        if ((old_m & threshold) && !(z80.clock.m & threshold)) {
+                        if ((old_m & threshold) && !(z80.clock.m & threshold))
+                        {
                                 z80.clock.tima++;
-                                if (!z80.clock.tima) {
+                                if (!z80.clock.tima)
+                                {
                                         z80.clock.tima = z80.clock.tma;
                                         z80.int_f |= 4;
                                 }
                         }
                         old_m = z80.clock.m;
                 }
-        } else {
+        }
+        else
+        {
                 z80.clock.m += z80.t;
         }
+        mmu->rtc.m_cycles += z80.m;
+        if ((mmu->rtc.m_cycles >= 32) && (!mmu->rtc.halt_flag))
+        {
+                mmu->rtc.m_cycles -= 32;
+                mmu->rtc.ticks++;
+                if (mmu->rtc.ticks >= 0x8000)
+                {
+                        mmu->rtc.ticks -= 0x8000;
+                        mmu->rtc.seconds = (mmu->rtc.seconds + 1) & 0x3F;
+                        if (mmu->rtc.seconds == 60)
+                        {
+                                mmu->rtc.seconds -= 60;
+                                mmu->rtc.minutes = (mmu->rtc.minutes + 1) & 0x3F;
+                                if (mmu->rtc.minutes == 60)
+                                {
+                                        mmu->rtc.minutes -= 60;
+                                        mmu->rtc.hours = (mmu->rtc.hours + 1) & 0x1F;
+                                        if (mmu->rtc.hours == 24)
+                                        {
+                                                mmu->rtc.hours -= 24;
+                                                mmu->rtc.day_counter = (mmu->rtc.day_counter + 1) & 0x3FF;
+                                                if (mmu->rtc.day_counter == 512)
+                                                {
+                                                        mmu->rtc.day_counter_carry = true;
+                                                        mmu->rtc.day_counter -= 512;
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
 }
-
-
-
-
 
 /* Opcode definitions */
 
 /* 8-bit loads */
-void LD_nn_n(unsigned char *r, unsigned char n) {
+void LD_nn_n(unsigned char *r, unsigned char n)
+{
         PRINT_ASM(n);
         *r = n;
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LD_r1_r2(unsigned char *r1, unsigned char r2, unsigned char m_time) {
+void LD_r1_r2(unsigned char *r1, unsigned char r2, unsigned char m_time)
+{
         PRINT_ASM();
         *r1 = r2;
-        
+
         z80.m = m_time;
         z80.t = 4 * m_time;
 }
 
 /* void LD_r1_HL(unsigned char *r1) {
         *r1 = rb(z80.hl);
-        
+
         z80.m = 2;
         z80.t = 8;
 } */
 
-void LD_HL_r2(unsigned char r2) {
+void LD_HL_r2(unsigned char r2)
+{
         PRINT_ASM();
         wb(z80.hl, r2);
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LD_HL_n(unsigned char n) {
+void LD_HL_n(unsigned char n)
+{
         PRINT_ASM(n);
         wb(z80.hl, n);
-        
+
         z80.m = 3;
         z80.t = 12;
 }
@@ -532,12 +681,13 @@ void LD_HL_n(unsigned char n) {
 /*void LD_A_n(unsigned char *n, unsigned char m_time) {
         PRINT_ASM(n);
         z80.a = *n;
-        
+
         z80.m = m_time;
         z80.t = 4 * m_time;
 }*/
 
-void LD_A_rb(unsigned short nn, unsigned char m_time) {
+void LD_A_rb(unsigned short nn, unsigned char m_time)
+{
         PRINT_ASM(nn);
         z80.a = rb(nn);
 
@@ -548,74 +698,82 @@ void LD_A_rb(unsigned short nn, unsigned char m_time) {
 /*void LD_n_A(unsigned char *n, unsigned char m_time) {
         PRINT_ASM(n);
         *n = z80.a;
-        
+
         z80.m = m_time;
         z80.t = 4 * m_time;
 }*/
 
-void LD_wb_A(unsigned short n, unsigned char m_time) {
+void LD_wb_A(unsigned short n, unsigned char m_time)
+{
         PRINT_ASM(n);
         wb(n, z80.a);
-        
+
         z80.m = m_time;
         z80.t = 4 * m_time;
 }
 
-void LD_A_C() {
+void LD_A_C()
+{
         PRINT_ASM(0xFF00 + z80.c);
         z80.a = rb(0xFF00 + z80.c);
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LD_C_A() {
+void LD_C_A()
+{
         PRINT_ASM(0xFF00 + z80.c);
         wb(0xFF00 + z80.c, z80.a);
 
         // assert(z80.a == rb(0xFF00 + z80.c));
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LDD_A_HL() {
+void LDD_A_HL()
+{
         PRINT_ASM();
         z80.a = rb(z80.hl);
         z80.hl--;
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LDD_HL_A() {
+void LDD_HL_A()
+{
         PRINT_ASM();
         wb(z80.hl, z80.a);
         z80.hl--;
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LDI_A_HL() {
+void LDI_A_HL()
+{
         PRINT_ASM();
         z80.a = rb(z80.hl);
         z80.hl++;
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LDI_HL_A() {
+void LDI_HL_A()
+{
         PRINT_ASM();
         wb(z80.hl, z80.a);
         z80.hl++;
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void LDH_n_A(unsigned char n) {
+void LDH_n_A(unsigned char n)
+{
         PRINT_ASM(n);
 
         // assert(z80.a == rb(0xFF00 + n));
@@ -625,30 +783,33 @@ void LDH_n_A(unsigned char n) {
         wb(0xFF00 + n, z80.a);
 }
 
-void LDH_A_n(unsigned char n) {
+void LDH_A_n(unsigned char n)
+{
         z80.a = rb(0xFF00 + n);
-        PRINT_ASM(n,z80.a);
+        PRINT_ASM(n, z80.a);
         z80.m = 3;
         z80.t = 12;
 }
 
-
 /* 16-bit loads */
-void LD_n_nn(unsigned short *n, unsigned short nn) {
+void LD_n_nn(unsigned short *n, unsigned short nn)
+{
         PRINT_ASM(nn);
         *n = nn;
         z80.m = 3;
         z80.t = 12;
 }
 
-void LD_SP_HL() {
+void LD_SP_HL()
+{
         PRINT_ASM();
         z80.sp = z80.hl;
         z80.m = 2;
         z80.t = 8;
 }
 
-void LDHL_SP_n(signed char n) {
+void LDHL_SP_n(signed char n)
+{
         PRINT_ASM(n);
         int tmp = z80.sp;
         tmp += (int)n;
@@ -665,41 +826,44 @@ void LDHL_SP_n(signed char n) {
         z80.t = 12;
 }
 
-void LD_nn_SP(unsigned short nn) {
+void LD_nn_SP(unsigned short nn)
+{
         PRINT_ASM(nn);
         ww(nn, z80.sp);
         z80.m = 5;
         z80.t = 20;
 }
 
-void PUSH_nn(const unsigned short *nn) {
+void PUSH_nn(const unsigned short *nn)
+{
         PRINT_ASM();
-        wb(--z80.sp, (*nn >> 8)  & 0xFF);
+        wb(--z80.sp, (*nn >> 8) & 0xFF);
         wb(--z80.sp, *nn & 0xFF);
         z80.m = 4;
         z80.t = 16;
 }
 
-void POP_nn(unsigned short *nn) {
+void POP_nn(unsigned short *nn)
+{
         PRINT_ASM();
 
         *nn = rw(z80.sp);
-        if (nn == &z80.af) *nn &= (0xFFF0);
+        if (nn == &z80.af)
+                *nn &= (0xFFF0);
 
         z80.sp += 2;
-        
+
         z80.m = 3;
         z80.t = 12;
 }
 
-
 /* 8-bit ALU */
-void ADD_A_n(unsigned char n, unsigned char m_time) {
+void ADD_A_n(unsigned char n, unsigned char m_time)
+{
         PRINT_ASM(n);
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_HC_ADD(z80.a, n);
         SET_C_ADD(z80.a, n);
-
 
         z80.a += n;
         SET_Z_RES(z80.a);
@@ -708,7 +872,8 @@ void ADD_A_n(unsigned char n, unsigned char m_time) {
         z80.t = 4 * m_time;
 }
 
-void ADC_A_n(unsigned char n, unsigned char m_time) {
+void ADC_A_n(unsigned char n, unsigned char m_time)
+{
         unsigned char carry = GET_BIT(z80.f, CARRY);
         PRINT_ASM(n);
         SET_HC_ADC(z80.a, n, carry);
@@ -723,41 +888,44 @@ void ADC_A_n(unsigned char n, unsigned char m_time) {
         z80.t = 4 * m_time;
 }
 
-void SUB_A_n(unsigned char n, unsigned char m_time) {
+void SUB_A_n(unsigned char n, unsigned char m_time)
+{
         PRINT_ASM(n);
         BIT_SET(z80.f, SUBTRACT);
         SET_HC_SUB(z80.a, n);
         SET_C_SUB(z80.a, n);
-        
+
         z80.a -= n;
 
         SET_Z_RES(z80.a);
-        
+
         z80.m = m_time;
         z80.t = 4 * m_time;
 }
-void SBC_A_n(unsigned char n, unsigned char m_time) {
+void SBC_A_n(unsigned char n, unsigned char m_time)
+{
         unsigned char carry = GET_BIT(z80.f, CARRY);
         PRINT_ASM(n);
-        
+
         BIT_SET(z80.f, SUBTRACT);
         SET_HC_SBC(z80.a, n, carry);
         SET_C_SBC(z80.a, n, carry);
 
         z80.a = 0xFF & (z80.a - n - carry);
         SET_Z_RES(z80.a);
-        
+
         z80.m = m_time;
         z80.t = 4 * m_time;
 }
 
-void AND_n(unsigned char n, unsigned char m_time) {
+void AND_n(unsigned char n, unsigned char m_time)
+{
         PRINT_ASM(n);
         z80.a &= n;
 
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, CARRY);
-        
+
         SET_Z_RES(z80.a);
         BIT_SET(z80.f, HALF_CARRY);
 
@@ -765,7 +933,8 @@ void AND_n(unsigned char n, unsigned char m_time) {
         z80.t = 4 * m_time;
 }
 
-void OR_n(unsigned char n, unsigned char m_time) {
+void OR_n(unsigned char n, unsigned char m_time)
+{
         PRINT_ASM(n);
         z80.a |= n;
 
@@ -776,7 +945,8 @@ void OR_n(unsigned char n, unsigned char m_time) {
         z80.t = 4 * m_time;
 }
 
-void XOR_n(unsigned char n, unsigned char m_time) {
+void XOR_n(unsigned char n, unsigned char m_time)
+{
         PRINT_ASM(n);
         z80.a ^= n;
         BIT_CLEAR(z80.f, CARRY);
@@ -785,12 +955,12 @@ void XOR_n(unsigned char n, unsigned char m_time) {
 
         SET_Z_RES(z80.a);
 
-
         z80.m = m_time;
         z80.t = 4 * m_time;
 }
 
-void CP_n(unsigned char n, unsigned char m_time) {
+void CP_n(unsigned char n, unsigned char m_time)
+{
         PRINT_ASM(n);
         SET_C_SUB(z80.a, n);
         SET_HC_SUB(z80.a, n);
@@ -804,7 +974,8 @@ void CP_n(unsigned char n, unsigned char m_time) {
         z80.t = 4 * m_time;
 }
 
-void INC_n(unsigned char *n) {
+void INC_n(unsigned char *n)
+{
         PRINT_ASM(*n);
 
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -817,7 +988,8 @@ void INC_n(unsigned char *n) {
         z80.t = 4;
 }
 
-void INC_HL() {
+void INC_HL()
+{
         unsigned char tmp = rb(z80.hl);
         PRINT_ASM(tmp);
 
@@ -825,7 +997,7 @@ void INC_HL() {
         tmp += 1;
 
         wb(z80.hl, tmp);
-        
+
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_Z_RES(tmp);
 
@@ -833,7 +1005,8 @@ void INC_HL() {
         z80.t = 12;
 }
 
-void DEC_n(unsigned char *n) {
+void DEC_n(unsigned char *n)
+{
         PRINT_ASM(*n);
         BIT_SET(z80.f, SUBTRACT);
         BIT_EQUAL(z80.f, HALF_CARRY, ((*n) & 0xF) == 0);
@@ -845,7 +1018,8 @@ void DEC_n(unsigned char *n) {
         z80.t = 4;
 }
 
-void DEC_HL() {
+void DEC_HL()
+{
         unsigned char tmp = rb(z80.hl);
         PRINT_ASM(tmp);
 
@@ -860,9 +1034,9 @@ void DEC_HL() {
         z80.t = 12;
 }
 
-
 /* 16-bit ALU */
-void ADD_HL_n(const unsigned short *n) {
+void ADD_HL_n(const unsigned short *n)
+{
         PRINT_ASM();
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_HC_ADD_16(z80.hl, *n);
@@ -874,7 +1048,8 @@ void ADD_HL_n(const unsigned short *n) {
         z80.t = 8;
 }
 
-void ADD_SP_n(signed char n) {
+void ADD_SP_n(signed char n)
+{
         PRINT_ASM(n);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, ZERO);
@@ -887,7 +1062,8 @@ void ADD_SP_n(signed char n) {
         z80.t = 16;
 }
 
-void INC_nn(unsigned short *nn) {
+void INC_nn(unsigned short *nn)
+{
         PRINT_ASM();
         (*nn)++;
 
@@ -895,7 +1071,8 @@ void INC_nn(unsigned short *nn) {
         z80.t = 8;
 }
 
-void DEC_nn(unsigned short *nn) {
+void DEC_nn(unsigned short *nn)
+{
         PRINT_ASM();
         (*nn)--;
 
@@ -904,7 +1081,8 @@ void DEC_nn(unsigned short *nn) {
 }
 
 /* Misc */
-void SWAP_n(unsigned char *n) {
+void SWAP_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         unsigned char tmp = 0;
         tmp |= ((*n) >> 4) & 0x0F;
@@ -921,7 +1099,8 @@ void SWAP_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void SWAP_HL() {
+void SWAP_HL()
+{
         PRINT_ASM_CB();
         unsigned char tmp = 0, val;
         val = rb(z80.hl);
@@ -940,22 +1119,29 @@ void SWAP_HL() {
         z80.t = 16;
 }
 
-
-void DAA() {
+void DAA()
+{
         PRINT_ASM();
-        if (!GET_BIT(z80.f, SUBTRACT)) {
-                if (GET_BIT(z80.f, CARRY) || z80.a > 0x99) {
+        if (!GET_BIT(z80.f, SUBTRACT))
+        {
+                if (GET_BIT(z80.f, CARRY) || z80.a > 0x99)
+                {
                         z80.a += 0x60;
                         BIT_SET(z80.f, CARRY);
                 }
-                if (GET_BIT(z80.f, HALF_CARRY) || (z80.a & 0x0F) > 0x09) {
+                if (GET_BIT(z80.f, HALF_CARRY) || (z80.a & 0x0F) > 0x09)
+                {
                         z80.a += 0x06;
                 }
-        } else {
-                if (GET_BIT(z80.f, CARRY)) {
+        }
+        else
+        {
+                if (GET_BIT(z80.f, CARRY))
+                {
                         z80.a -= 0x60;
                 }
-                if (GET_BIT(z80.f, HALF_CARRY)) {
+                if (GET_BIT(z80.f, HALF_CARRY))
+                {
                         z80.a -= 0x06;
                 }
         }
@@ -967,7 +1153,8 @@ void DAA() {
         z80.t = 4;
 }
 
-void CPL() {
+void CPL()
+{
         PRINT_ASM();
         z80.a = ~z80.a;
         BIT_SET(z80.f, SUBTRACT);
@@ -977,7 +1164,8 @@ void CPL() {
         z80.t = 4;
 }
 
-void CCF() {
+void CCF()
+{
         PRINT_ASM();
         BIT_FLIP(z80.f, CARRY);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -987,7 +1175,8 @@ void CCF() {
         z80.t = 4;
 }
 
-void SCF() {
+void SCF()
+{
         PRINT_ASM();
         BIT_SET(z80.f, CARRY);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -997,13 +1186,15 @@ void SCF() {
         z80.t = 4;
 }
 
-void NOP() {
+void NOP()
+{
         PRINT_ASM();
         z80.m = 1;
         z80.t = 4;
 }
 
-void HALT() {
+void HALT()
+{
         PRINT_ASM();
         z80.halt = true;
 
@@ -1011,7 +1202,8 @@ void HALT() {
         z80.t = 4;
 }
 
-void STOP() {
+void STOP()
+{
         PRINT_ASM();
         z80.stop = true;
 
@@ -1019,7 +1211,8 @@ void STOP() {
         z80.t = 4;
 }
 
-void DI() {
+void DI()
+{
         PRINT_ASM();
         z80.ime = false;
         z80.new_ime = false;
@@ -1028,16 +1221,20 @@ void DI() {
         z80.t = 4;
 }
 
-void EI() {
+void EI()
+{
         PRINT_ASM();
         z80.new_ime = true;
+        // z80.ime = true;
+        // printf("ime: %d", z80.ime);
 
         z80.m = 1;
         z80.t = 4;
 }
 
 /* Rotates & Shifts */
-void RLCA() {
+void RLCA()
+{
         PRINT_ASM();
         z80.a = (unsigned char)((z80.a << 1) | (z80.a >> 7));
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 0));
@@ -1045,12 +1242,13 @@ void RLCA() {
         BIT_CLEAR(z80.f, ZERO);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
-        
+
         z80.m = 1;
         z80.t = 4;
 }
 
-void RLA() {
+void RLA()
+{
         PRINT_ASM();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 7));
@@ -1064,7 +1262,8 @@ void RLA() {
         z80.t = 4;
 }
 
-void RRCA() {
+void RRCA()
+{
         PRINT_ASM();
         z80.a = (unsigned char)((z80.a >> 1) | (z80.a << 7));
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 7));
@@ -1077,7 +1276,8 @@ void RRCA() {
         z80.t = 4;
 }
 
-void RRA() {
+void RRA()
+{
         PRINT_ASM();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 0));
@@ -1091,7 +1291,8 @@ void RRA() {
         z80.t = 4;
 }
 
-void RLC_n(unsigned char *n) {
+void RLC_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         *n = (unsigned char)((*n << 1) | (*n >> 7));
         BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 0));
@@ -1099,12 +1300,13 @@ void RLC_n(unsigned char *n) {
         SET_Z_RES(*n);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
-        
+
         z80.m = 2;
         z80.t = 8;
 }
 
-void RLC_HL() {
+void RLC_HL()
+{
         PRINT_ASM_CB();
         unsigned char val = rb(z80.hl);
         val = (unsigned char)((val << 1) | (val >> 7));
@@ -1115,12 +1317,13 @@ void RLC_HL() {
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
-        
+
         z80.m = 4;
         z80.t = 16;
 }
 
-void RL_n(unsigned char *n) {
+void RL_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
         BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 7));
@@ -1134,7 +1337,8 @@ void RL_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void RL_HL() {
+void RL_HL()
+{
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
         unsigned char val = rb(z80.hl);
@@ -1151,7 +1355,8 @@ void RL_HL() {
         z80.t = 16;
 }
 
-void RRC_n(unsigned char *n) {
+void RRC_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         *n = (unsigned char)((*n >> 1) | (*n << 7));
         BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 7));
@@ -1164,7 +1369,8 @@ void RRC_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void RRC_HL() {
+void RRC_HL()
+{
         PRINT_ASM_CB();
         unsigned char val = rb(z80.hl);
 
@@ -1180,10 +1386,11 @@ void RRC_HL() {
         z80.t = 16;
 }
 
-void RR_n(unsigned char *n) {
+void RR_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        BIT_EQUAL(z80.f, CARRY, (*n)&1);
+        BIT_EQUAL(z80.f, CARRY, (*n) & 1);
         *n = (unsigned char)((*n >> 1) | (old_carry << 7));
 
         SET_Z_RES(*n);
@@ -1194,11 +1401,12 @@ void RR_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void RR_HL() {
+void RR_HL()
+{
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
         unsigned char val = rb(z80.hl);
-        BIT_EQUAL(z80.f, CARRY, val&1);
+        BIT_EQUAL(z80.f, CARRY, val & 1);
         val = (unsigned char)((val >> 1) | (old_carry << 7));
         wb(z80.hl, val);
 
@@ -1210,7 +1418,8 @@ void RR_HL() {
         z80.t = 16;
 }
 
-void SLA_n(unsigned char *n) {
+void SLA_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 7));
         *n = (unsigned char)(*n << 1);
@@ -1223,7 +1432,8 @@ void SLA_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void SLA_HL() {
+void SLA_HL()
+{
         PRINT_ASM_CB();
         unsigned char val = rb(z80.hl);
 
@@ -1239,10 +1449,11 @@ void SLA_HL() {
         z80.t = 16;
 }
 
-void SRA_n(unsigned char *n) {
+void SRA_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 0));
-        *n = (unsigned char) (((signed char) *n) >> 1);
+        *n = (unsigned char)(((signed char)*n) >> 1);
 
         SET_Z_RES(*n);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -1252,11 +1463,12 @@ void SRA_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void SRA_HL() {
+void SRA_HL()
+{
         PRINT_ASM_CB();
         unsigned char val = rb(z80.hl);
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 0));
-        val = (unsigned char) (((signed char) val) >> 1);
+        val = (unsigned char)(((signed char)val) >> 1);
         wb(z80.hl, val);
 
         SET_Z_RES(val);
@@ -1267,10 +1479,11 @@ void SRA_HL() {
         z80.t = 16;
 }
 
-void SRL_n(unsigned char *n) {
+void SRL_n(unsigned char *n)
+{
         PRINT_ASM_CB();
         BIT_EQUAL(z80.f, CARRY, (*n) & 0x1);
-        *n =  (unsigned char)((*n) >> 1);
+        *n = (unsigned char)((*n) >> 1);
 
         assert(GET_BIT(*n, 7) == 0);
 
@@ -1282,11 +1495,12 @@ void SRL_n(unsigned char *n) {
         z80.t = 8;
 }
 
-void SRL_HL() {
+void SRL_HL()
+{
         PRINT_ASM_CB();
         unsigned char val = rb(z80.hl);
         BIT_EQUAL(z80.f, CARRY, val & 0x1);
-        val =  (unsigned char)(val >> 1);
+        val = (unsigned char)(val >> 1);
 
         assert(GET_BIT(val, 7) == 0);
         wb(z80.hl, val);
@@ -1299,9 +1513,9 @@ void SRL_HL() {
         z80.t = 16;
 }
 
-
 /* Bit Opcodes */
-void BIT_b_r(unsigned char b, unsigned char r) {
+void BIT_b_r(unsigned char b, unsigned char r)
+{
         PRINT_ASM_CB(b);
         BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -1311,7 +1525,8 @@ void BIT_b_r(unsigned char b, unsigned char r) {
         z80.t = 8;
 }
 
-void BIT_b_HL(unsigned char b) {
+void BIT_b_HL(unsigned char b)
+{
         PRINT_ASM_CB(b);
         unsigned char r = rb(z80.hl);
         BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
@@ -1322,7 +1537,8 @@ void BIT_b_HL(unsigned char b) {
         z80.t = 12;
 }
 
-void SET_b_r(unsigned char b, unsigned char *r) {
+void SET_b_r(unsigned char b, unsigned char *r)
+{
         PRINT_ASM_CB(b);
         BIT_SET(*r, b);
 
@@ -1330,7 +1546,8 @@ void SET_b_r(unsigned char b, unsigned char *r) {
         z80.t = 8;
 }
 
-void SET_b_HL(unsigned char b) {
+void SET_b_HL(unsigned char b)
+{
         PRINT_ASM_CB(b);
         unsigned char r = rb(z80.hl);
         BIT_SET(r, b);
@@ -1340,7 +1557,8 @@ void SET_b_HL(unsigned char b) {
         z80.t = 16;
 }
 
-void RES_b_r(unsigned char b, unsigned char *r) {
+void RES_b_r(unsigned char b, unsigned char *r)
+{
         PRINT_ASM_CB(b);
         BIT_CLEAR(*r, b);
 
@@ -1348,7 +1566,8 @@ void RES_b_r(unsigned char b, unsigned char *r) {
         z80.t = 8;
 }
 
-void RES_b_HL(unsigned char b) {
+void RES_b_HL(unsigned char b)
+{
         PRINT_ASM_CB(b);
         unsigned char r = rb(z80.hl);
         BIT_CLEAR(r, b);
@@ -1358,9 +1577,9 @@ void RES_b_HL(unsigned char b) {
         z80.t = 16;
 }
 
-
 /* Jumps */
-void JP_nn(unsigned short nn) {
+void JP_nn(unsigned short nn)
+{
         PRINT_ASM(nn);
         z80.pc = nn;
 
@@ -1369,15 +1588,22 @@ void JP_nn(unsigned short nn) {
         /* maybe takes another m-cycle to jump. same for JP_cc_nn */
 }
 
-void JP_cc_nn(bool cc, unsigned short nn) {
+void JP_cc_nn(bool cc, unsigned short nn)
+{
         PRINT_ASM(nn);
 
         z80.m = 3;
         z80.t = 12;
-        if (cc) {z80.pc = nn; z80.m += 1; z80.t += 4;}
+        if (cc)
+        {
+                z80.pc = nn;
+                z80.m += 1;
+                z80.t += 4;
+        }
 }
 
-void JP_HL() {
+void JP_HL()
+{
         PRINT_ASM();
         z80.pc = z80.hl;
 
@@ -1385,7 +1611,8 @@ void JP_HL() {
         z80.t = 4;
 }
 
-void JR_n(signed char n) {
+void JR_n(signed char n)
+{
         PRINT_ASM(n);
         z80.pc += n;
 
@@ -1393,29 +1620,38 @@ void JR_n(signed char n) {
         z80.t = 12;
 }
 
-void JR_cc_n(bool cc, signed char n) {
+void JR_cc_n(bool cc, signed char n)
+{
         PRINT_ASM(n);
 
         z80.m = 2;
         z80.t = 8;
-        if (cc) {z80.pc += n; z80.m += 1; z80.t += 4;}
+        if (cc)
+        {
+                z80.pc += n;
+                z80.m += 1;
+                z80.t += 4;
+        }
 }
 
-
 /* Calls */
-void CALL_nn(unsigned short nn) {
+void CALL_nn(unsigned short nn)
+{
         PRINT_ASM(nn);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
+        // printf("(%04x) = %04x\n", z80.sp, z80.pc);
         z80.pc = nn;
 
         z80.m = 6;
         z80.t = 24;
 }
 
-void CALL_cc_nn(bool cc, unsigned short nn) {
+void CALL_cc_nn(bool cc, unsigned short nn)
+{
         PRINT_ASM(nn);
-        if (cc) {
+        if (cc)
+        {
                 z80.sp -= 2;
                 ww(z80.sp, z80.pc);
                 z80.pc = nn;
@@ -1429,9 +1665,9 @@ void CALL_cc_nn(bool cc, unsigned short nn) {
         z80.t = 12;
 }
 
-
 /* Restarts */
-void RST_n(unsigned char n) {
+void RST_n(unsigned char n)
+{
         PRINT_ASM(n);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
@@ -1441,7 +1677,8 @@ void RST_n(unsigned char n) {
         z80.t = 16;
 }
 
-void RST40() {
+void RST40()
+{
         // printf("0x%04x RST 40\n", z80.pc);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
@@ -1451,7 +1688,8 @@ void RST40() {
         z80.t = 16;
 }
 
-void RST48() {
+void RST48()
+{
         // printf("0x%04x RST 48\n", z80.pc);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
@@ -1461,7 +1699,8 @@ void RST48() {
         z80.t = 16;
 }
 
-void RST50() {
+void RST50()
+{
         // printf("0x%04x RST 50\n", z80.pc);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
@@ -1471,7 +1710,8 @@ void RST50() {
         z80.t = 16;
 }
 
-void RST58() {
+void RST58()
+{
         // printf("0x%04x RST 58\n", z80.pc);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
@@ -1481,7 +1721,8 @@ void RST58() {
         z80.t = 16;
 }
 
-void RST60() {
+void RST60()
+{
         // printf("0x%04x RST 60\n", z80.pc);
         z80.sp -= 2;
         ww(z80.sp, z80.pc);
@@ -1491,21 +1732,25 @@ void RST60() {
         z80.t = 16;
 }
 
-
 /* Returns */
-void RET() {
+void RET()
+{
         PRINT_ASM();
         z80.pc = rw(z80.sp);
+        // printf("%04x = (%04x)\n", z80.pc, z80.pc);
         z80.sp += 2;
 
         z80.m = 4;
         z80.t = 16;
 }
 
-void RET_cc(bool cc) {
+void RET_cc(bool cc)
+{
         PRINT_ASM();
-        if (cc) {
+        if (cc)
+        {
                 z80.pc = rw(z80.sp);
+                // printf("%04x = (%04x)\n", z80.pc, z80.sp);
                 z80.sp += 2;
 
                 z80.m = 5;
@@ -1517,8 +1762,8 @@ void RET_cc(bool cc) {
         z80.t = 8;
 }
 
-
-void RETI() {
+void RETI()
+{
         PRINT_ASM();
         z80.pc = rw(z80.sp);
         z80.sp += 2;
@@ -1529,45 +1774,41 @@ void RETI() {
 }
 
 static bool (*table_cc[])(void) = {
-        cc_nz, cc_z, cc_nc, cc_c
-};
+    cc_nz, cc_z, cc_nc, cc_c};
 
 static void (*table_alu[])(unsigned char, unsigned char) = {
-        ADD_A_n, ADC_A_n, SUB_A_n, SBC_A_n, AND_n, XOR_n, OR_n, CP_n
-};
+    ADD_A_n, ADC_A_n, SUB_A_n, SBC_A_n, AND_n, XOR_n, OR_n, CP_n};
 
-static void (*table_rot[])(unsigned char*) = {
-        RLC_n, RRC_n, RL_n, RR_n, SLA_n, SRA_n, SWAP_n, SRL_n
-};
+static void (*table_rot[])(unsigned char *) = {
+    RLC_n, RRC_n, RL_n, RR_n, SLA_n, SRA_n, SWAP_n, SRL_n};
 static void (*table_rot_HL[])(void) = {
-        RLC_HL, RRC_HL, RL_HL, RR_HL, SLA_HL, SRA_HL, SWAP_HL, SRL_HL
-};
+    RLC_HL, RRC_HL, RL_HL, RR_HL, SLA_HL, SRA_HL, SWAP_HL, SRL_HL};
 
-
-bool cc_nz() {
+bool cc_nz()
+{
         return !BIT_CHECK(z80.f, ZERO);
 }
 
-bool cc_z() {
+bool cc_z()
+{
         return BIT_CHECK(z80.f, ZERO);
 }
 
-bool cc_nc() {
+bool cc_nc()
+{
         return !BIT_CHECK(z80.f, CARRY);
 }
 
-bool cc_c() {
+bool cc_c()
+{
         return BIT_CHECK(z80.f, CARRY);
 }
 
 static unsigned char *table_r[] = {
-        &z80.b, &z80.c, &z80.d, &z80.e, &z80.h, &z80.l, NULL, &z80.a
-};
+    &z80.b, &z80.c, &z80.d, &z80.e, &z80.h, &z80.l, NULL, &z80.a};
 
 static unsigned short *table_rp[] = {
-        &z80.bc, &z80.de, &z80.hl, &z80.sp
-};
+    &z80.bc, &z80.de, &z80.hl, &z80.sp};
 
 static unsigned short *table_rp2[] = {
-        &z80.bc, &z80.de, &z80.hl, &z80.af
-};
+    &z80.bc, &z80.de, &z80.hl, &z80.af};

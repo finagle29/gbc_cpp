@@ -20,6 +20,8 @@ void ww(unsigned short addr, unsigned short val);
 typedef struct
 {
         unsigned char last_latch_write;
+        unsigned char m_cycles;
+        unsigned short ticks;
         unsigned char seconds;
         unsigned char minutes;
         unsigned char hours;
@@ -36,6 +38,7 @@ typedef struct
                                  // mode = 1 means MBC1 is 4/32
         // unsigned char serial;
         rtc_type rtc;
+        rtc_type rtc_latched;
 
         unsigned char bios[0x100];
         unsigned char vram[0x2000];
