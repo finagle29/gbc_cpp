@@ -29,11 +29,12 @@ SDL_AudioDeviceID dev;
 // remainder cycles
 int extra_ticks = 0;
 
+bool quit = false;
+
 void audio_callback(void *userdata, unsigned char *stream, int len)
 {
         int i = 0;
         int cycles = 0;
-        bool quit = false;
         bool stereo;
 
         extra_ticks += 233;
@@ -47,6 +48,13 @@ void audio_callback(void *userdata, unsigned char *stream, int len)
                 i += cycles;
                 // } while (i < 17556 && !quit);
         } while (i < 22369 + extra_cycle && !quit);
+        if (quit)
+        {
+                // SDL_Event event;
+                // event.type = SDL_QUIT;
+                // SDL_PushEvent(&event);
+                SDL_PauseAudioDevice(dev, 1);
+        }
         z80.clock.long_time = 0;
 
         stereo = Gb_Apu_end_frame(apu, i * 4);
@@ -285,6 +293,7 @@ int main(int argc, char *argv[])
                         SDL_Delay(1000);
                 }
         }
+        SDL_PauseAudioDevice(dev, 1);
 
         cleanup();
 
