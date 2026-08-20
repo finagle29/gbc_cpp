@@ -1,7 +1,7 @@
 # gbc_cpp
 GameBoy (eventually Color) Emulator in C(++)
 
-[![Build Status](https://github.com/finagle29/gbc_cpp/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/finagle29/gbc_cpp/actions/workflows/cmake-multi-platform.yml)
+[![Build (ubuntu, macos)](https://github.com/finagle29/gbc_cpp/actions/workflows/build.yml/badge.svg)](https://github.com/finagle29/gbc_cpp/actions/workflows/build.yml)
 
 Use cmake to build.
 
