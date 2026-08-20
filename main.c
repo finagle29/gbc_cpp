@@ -12,8 +12,8 @@
 #include "keys.h"
 #include "mmu.h"
 
-extern bool show_tileset, show_bgmap;
-extern SDL_Window *window, *vram_w, *bg_w;
+// extern bool show_tileset, show_bgmap;
+// extern SDL_Window *window, *vram_w, *bg_w;
 
 bool frame(void);
 

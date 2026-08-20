@@ -40,10 +40,8 @@ typedef struct
 } gpu_type;
 
 extern gpu_type gpu;
-
-SDL_Window *window, *vram_w, *bg_w;
-SDL_Renderer *renderer, *vram_r, *bg_r;
-SDL_Texture *framebuffer, *framebuffer_tileset, *framebuffer_bgmap;
+extern SDL_Window *window, *vram_w, *bg_w;
+extern bool show_tileset, show_bgmap;
 
 void setup(bool, bool);
 void cleanup(void);
