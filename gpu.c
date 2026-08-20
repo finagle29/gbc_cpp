@@ -5,6 +5,10 @@
 
 gpu_type gpu;
 
+SDL_Window *window, *vram_w, *bg_w;
+SDL_Renderer *renderer, *vram_r, *bg_r;
+SDL_Texture *framebuffer, *framebuffer_tileset, *framebuffer_bgmap;
+
 #define RGBA(r, g, b) (((((r << 8) | g) << 8) | b) << 8) | 0xFF
 
 bool show_tileset, show_bgmap;
