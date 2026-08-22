@@ -139,6 +139,146 @@ void scan_oam()
         gpu.num_sprites = i;
 }
 
+void gpu_m_tick()
+{
+        if (gpu.do_DMA)
+        {
+                if (gpu.DMA >= 0xE0)
+                {
+                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)((gpu.DMA - 0x20) << 8) + gpu.DMA_ptr);
+                }
+                else
+                {
+                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
+                }
+                gpu.DMA_ptr++;
+                if (gpu.DMA_ptr >= 0xA0)
+                {
+                        gpu.do_DMA = false;
+                        gpu.DMA_ptr = 0;
+                }
+        }
+
+        if (!GPU_DISP)
+        {
+                gpu.mode = 0;
+                gpu.gpu_stat = gpu.mode |
+                               ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
+                               (gpu.gpu_stat & 0xF8);
+                return;
+        }
+        gpu.mode_clock += 4;
+
+        switch (gpu.mode)
+        {
+        // OAM read mode, scanline is active
+        case 2:
+                if (gpu.mode_clock >= 80)
+                {
+                        scan_oam();
+                        gpu.mode_clock = 0;
+                        gpu.mode = 3;
+                }
+                break;
+
+        // VRAM read mode, scanline active
+        // treat end of mode 3 as end of scanline
+        case 3:
+                if (gpu.mode_clock >= 172)
+                {
+                        // enter HBlank
+                        gpu.mode_clock = 0;
+                        gpu.mode = 0;
+
+                        // Write a scanline to the framebuffer
+                        renderscan();
+                }
+                break;
+
+        // HBlank. after the last one push the screen data
+        case 0:
+                if (gpu.mode_clock >= 204)
+                {
+                        gpu.mode_clock = 0;
+                        gpu.line++;
+                        gpu.gpu_stat |= ((gpu.line == gpu.lineYC) ? 1 : 0 << 2);
+                        if ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40))
+                        {
+                                z80_p->int_f |= 0x2;
+                        }
+                        if (gpu.line == gpu.wdow_y)
+                                gpu.window_YC = true;
+
+                        if (gpu.line == 143)
+                        {
+                                // enter VBlank
+                                gpu.mode = 1;
+                                z80.int_f |= 1;
+
+                                for (int i = 0; i < 160 * 144; i++)
+                                {
+                                        tmp[i] = (pixels[i] / 2 + prev_pixels[i] / 2);
+                                        prev_pixels[i] = pixels[i];
+                                        tmp[i] = pixels[i];
+                                }
+
+                                renderscan();
+                                // SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
+                                SDL_UpdateTexture(framebuffer, NULL, tmp, 160 * sizeof(unsigned int));
+                                // SDL_UpdateTexture(framebuffer, NULL, pixels, 160 * sizeof(unsigned int));
+
+                                SDL_RenderCopy(renderer, framebuffer, NULL, NULL);
+                                // SDL_DestroyTexture(texture);
+                                SDL_RenderPresent(renderer);
+
+                                // framerate calculations go here
+                                if (show_tileset)
+                                        showTileSet();
+                                if (show_bgmap)
+                                        showBGMap();
+                        }
+                        else
+                        {
+                                gpu.mode = 2;
+                        }
+                }
+                break;
+
+        // VBlank
+        case 1:
+                gpu.window_YC = false;
+                if (gpu.mode_clock >= 456)
+                {
+                        gpu.mode_clock = 0;
+                        gpu.line++;
+                        gpu.gpu_stat |= ((gpu.line == gpu.lineYC) ? 1 : 0 << 2);
+                        if ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40))
+                        {
+                                z80_p->int_f |= 0x2;
+                        }
+
+                        if (gpu.line > 153)
+                        {
+                                // restart scanning mode
+                                gpu.mode = 2;
+                                gpu.line = 0;
+                                gpu.wdow_row = 0;
+                                if (gpu.line == gpu.wdow_y)
+                                        gpu.window_YC = true;
+                        }
+                }
+                break;
+        }
+        if (((gpu.mode == 0) && (gpu.gpu_stat & 0x8)) ||
+            ((gpu.mode == 2) && (gpu.gpu_stat & 0x20)) ||
+            ((gpu.mode == 1) && (gpu.gpu_stat & 0x30)))
+        {
+                z80_p->int_f |= 0x2;
+        }
+        gpu.gpu_stat = gpu.mode | ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
+                       (gpu.gpu_stat & 0xF8);
+}
+
 void gpu_step()
 {
         unsigned char i;

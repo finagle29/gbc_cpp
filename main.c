@@ -43,11 +43,12 @@ void audio_callback(void *userdata, unsigned char *stream, int len)
 
         do
         {
-                cycles = fetch_dispatch_execute();
-                quit = cycles ? false : true;
-                i += cycles;
+                cpu_tick();
+                // cycles = fetch_dispatch_execute();
+                // quit = cycles ? false : true;
+                // i += cycles;
                 // } while (i < 17556 && !quit);
-        } while (i < 22369 + extra_cycle && !quit);
+        } while (z80.clock.long_time < 22369 + extra_cycle && !quit);
         if (quit)
         {
                 // SDL_Event event;
@@ -55,10 +56,10 @@ void audio_callback(void *userdata, unsigned char *stream, int len)
                 // SDL_PushEvent(&event);
                 SDL_PauseAudioDevice(dev, 1);
         }
-        z80.clock.long_time = 0;
 
-        stereo = Gb_Apu_end_frame(apu, i * 4);
-        Multi_Buffer_end_frame(buf, i * 4, stereo);
+        stereo = Gb_Apu_end_frame(apu, z80.clock.long_time * 4);
+        Multi_Buffer_end_frame(buf, z80.clock.long_time * 4, stereo);
+        z80.clock.long_time = 0;
 
         Multi_Buffer_read_samples(buf, stream, len / 2);
 }
@@ -127,8 +128,6 @@ int main(int argc, char *argv[])
 
         dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
 
-        SDL_PauseAudioDevice(dev, 0);
-
         signal(SIGINT, INThandler);
 
         load_rom(game_name);
@@ -143,6 +142,11 @@ int main(int argc, char *argv[])
 
         bool quit = false;
         bool runframe = true;
+
+        z80.ir = rb(z80.pc);
+        z80.pc++;
+
+        SDL_PauseAudioDevice(dev, 0);
 
         // while (!getc(stdin)) {};
 

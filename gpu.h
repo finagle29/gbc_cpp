@@ -47,5 +47,6 @@ void setup(bool, bool);
 void cleanup(void);
 
 void gpu_step(void);
+void gpu_m_tick(void);
 
 #endif
