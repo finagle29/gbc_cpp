@@ -6,4 +6,4 @@ better MBC handling in MMU
 write wrappers for gb_apu/Blip_Buffer.cpp ?? dont think this is needed
 separate out emulation and rendering into separate threads
     - send pixel updates to rendering thread along with 
-fix timing
+fix ppu timing

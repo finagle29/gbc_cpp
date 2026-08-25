@@ -30,7 +30,6 @@ gbz80_type z80 = {
                .ir = 0},
            *z80_p;
 
-static unsigned char op;
 unsigned char z, w;
 unsigned short wz;
 signed char z_s;
