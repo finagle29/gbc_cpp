@@ -893,7 +893,7 @@ void LDH_n_A_t()
 void LDH_A_n_t()
 {
         z = rb_cpu(z80.pc);
-        PRINT_ASM(rb(0xFF00 + z), z80.a);
+        PRINT_ASM(z, rb(0xFF00 + z));
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();

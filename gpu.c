@@ -174,9 +174,8 @@ void gpu_m_tick()
         if (!GPU_DISP)
         {
                 gpu.mode = 0;
-                gpu.gpu_stat = gpu.mode |
-                               ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
-                               (gpu.gpu_stat & 0xF8);
+                gpu.line = 0;
+                gpu.gpu_stat &= 0xF8;
                 return;
         }
         gpu.mode_clock += 4;
