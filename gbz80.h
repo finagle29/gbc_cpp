@@ -41,7 +41,7 @@
                 printf(op_table[z80.ir], z80.pc - 1, ##__VA_ARGS__);
 #define PRINT_ASM_CB(...) \
         if (!mmu->inbios) \
-                printf(cb_op_table[z80.ir], z80.pc - 1, ##__VA_ARGS__);
+                printf(cb_op_table[z80.ir], z80.pc - 2, ##__VA_ARGS__);
 #else
 #define PRINT_ASM(...)
 #define PRINT_ASM_CB(...)

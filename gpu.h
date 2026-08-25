@@ -30,7 +30,7 @@ typedef struct
         unsigned char line, lineYC;
         unsigned char DMA, DMA_ptr;
         unsigned short mode_clock;
-        bool do_DMA, window_YC;
+        bool do_DMA, DMA_requested, reset_DMA, window_YC;
         unsigned char bg_pal, ob_pal0, ob_pal1;
         unsigned char wdow_y, wdow_x, wdow_row;
         unsigned char num_sprites;

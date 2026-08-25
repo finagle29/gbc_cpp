@@ -1,10 +1,20 @@
+Blargg/cpu_instrs.gb
+	passed
+
+Blargg/mem-timing.gb
+	passed
+
+Blargg/mem-timing-2.gb
+	passed
+
+Blargg/instr_timing.gb
+	passed
+
 mooneye-gb_hwtests/acceptance/timer
 div_write.gb
 	passed
 rapid_toggle.gb
-	assertions:
-		B: OK
-		C: D9! (DA)
+	passed
 tim00.gb
 	pass
 tim00_div_trigger.gb
@@ -64,7 +74,7 @@ daa.gb
 
 mooneye-gb_hwtests/acceptance/interrupts
 ie_push.gb
-	R1: not cancelled
+	passed
 
 
 mooneye-bg_hwtests/emulator_only/mbc1
@@ -128,19 +138,15 @@ boot_sclk_align-dmgABCmgb.gb
 
 mooneye-gb_hwtests/acceptance
 add_sp_e_timing.gb
-	assertions:
-		B: FF! (00)
-		C: FD! (40)
-		D: OK
-		E: OK
+	passed
 boot_div-dmgABCmgb.gb
 	assertions:
-		B: AC! (92)
-		C: AD! (93)
-		D: AD! (94)
-		E: AE! (95)
-		H: AF! (96)
-		L: B1! (97)
+		B: AC! (AB)
+		C: AD! (AC)
+		D: OK
+		E: OK
+		H: OK
+		L: B1! (B0)
 boot_hwio-dmgABCmgb.gb
 	mismatch at $FF00
 	expected CF
@@ -148,20 +154,12 @@ boot_hwio-dmgABCmgb.gb
 boot_regs-dmgABC.gb
 	passed
 call_cc_timing.gb
-	fail: round 1
-call_cc_timing2.gb
-	assertions:
-		B: 81! (FF)
-		C: 81! (9D)
-		D: 81! (FF)
-		E: OK
-		H: OK
-		L: OK
-di_timing-GS.gb
-	fail: round 1
-div_timing.gb
 	passed
-ei_sequence.gb
+call_cc_timing2.gb
+	passed
+di_timing-GS.gb
+	passed
+div_timing.gbei_sequence.gb
 	passed
 ei_timing.gb
 	passed
@@ -174,59 +172,36 @@ halt_ime0_nointr_timing.gb
 halt_ime1_timing.gb
 	passed
 halt_ime1_timing2-GS.gb
-	fail: round 1
+	passed
 if_ie_registers.gb
 	passed
 intr_timing.gb
-	assertions:
-		D: OK
-		E: 01! (00)
+	passed
 jp_cc_timing.gb
-	fail: round 1
+	passed
 jp_timing.gb
-	fail: round 1
+	passed
 ld_hl_sp_e_timing.gb
-	assertions:
-		B: CF! (D0)
-		C: FE! (41)
-		D: OK
-		E: OK
+	passed
 oam_dma_restart.gb
-	assertions:
-		C: FF! (01)
-		D: OK
+	passed
 oam_dma_start.gb
-	fail: round 1 rst $10
+	passed
 oam_dma_timing.gb
-	assertions:
-		C: FF! (01)
-		D: OK
+	passed
 pop_timing.gb
-	assertions:
-		A: OK
-		B: OK
-		C: OK
-		D: OK
-		E: 01! (00)
+	passed
 push_timing.gb
-	assertions:
-		D: 81! (42)
-		E: OK
-		H: OK
-		L: OK
+	passed
 rapid_di_ei.gb
 	passed
 ret_cc_timing.gb
-	fail: round 1
+	passed
 ret_timing.gb
-	fail: round 1
+	passed
 reti_intr_timing.gb
 	passed
 reti_timing.gb
-	fail: round 1
+	passed
 rst_timing.gb
-	assertions:
-		B: 81! (FF)
-		C: OK
-		D: OK
-		E: OK
+	passed

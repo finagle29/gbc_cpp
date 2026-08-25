@@ -158,6 +158,18 @@ void gpu_m_tick()
                         gpu.DMA_ptr = 0;
                 }
         }
+        if (gpu.reset_DMA)
+        {
+                gpu.do_DMA = true;
+                gpu.reset_DMA = false;
+                gpu.DMA_ptr = 0;
+        }
+        if (gpu.DMA_requested)
+        {
+                gpu.reset_DMA = true;
+                gpu.DMA_requested = false;
+                // no-op the first cycle
+        }
 
         if (!GPU_DISP)
         {

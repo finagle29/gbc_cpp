@@ -11,9 +11,11 @@ void print_n_bytes(unsigned short n);
 void save_sram(void);
 void load_rom(char *f);
 
+unsigned char rb_cpu(unsigned short addr);
 unsigned char rb(unsigned short addr);
 unsigned short rw(unsigned short addr);
 
+void wb_cpu(unsigned short addr, unsigned char val);
 void wb(unsigned short addr, unsigned char val);
 void ww(unsigned short addr, unsigned short val);
 

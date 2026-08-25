@@ -219,6 +219,106 @@ void load_rom(char *fname)
         // Need to handle RTC save from file
 }
 
+unsigned char rb_cpu(unsigned short addr)
+{
+        if (gpu.do_DMA)
+        {
+                printf("rb DMA ptr: 0x%02hhx\n", gpu.DMA_ptr);
+                // is it conflicting with OAM DMA bus?
+                if ((gpu.DMA >= 0x80) && (gpu.DMA < 0xA0))
+                {
+                        // DMA is using VRAM bus
+                        if ((addr >= 0x8000) && (addr < 0xA000))
+                        {
+                                // if we're trying to use the VRAM bus, we see the DMA data
+                                printf("DMA VRAM bus conflict. Read from 0x%04hx getting DMA data\n", addr);
+                                return rb((gpu.DMA << 8) + gpu.DMA_ptr);
+                        }
+                        else
+                        {
+                                return rb(addr);
+                        }
+                }
+                else
+                {
+                        // DMA is using external bus
+                        if ((addr >= 0x8000) && (addr < 0xA000))
+                        {
+                                // if we're trying on the VRAM bus, we're good!
+                                return rb(addr);
+                        }
+                        else
+                        {
+                                if (addr >= 0xFF00)
+                                {
+                                        return rb(addr);
+                                }
+                                printf("DMA external bus conflict. Read from 0x%04hx getting DMA data\n", addr);
+                                if (gpu.DMA >= 0xE0)
+                                {
+                                        return rb((unsigned short)((gpu.DMA - 0x20) << 8) + gpu.DMA_ptr);
+                                }
+                                else
+                                {
+                                        return rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
+                                }
+                        }
+                }
+        }
+        return rb(addr);
+}
+
+void wb_cpu(unsigned short addr, unsigned char val)
+{
+        if (gpu.do_DMA)
+        {
+                printf("wb DMA ptr: 0x%02hhx\n", gpu.DMA_ptr);
+                if ((gpu.DMA >= 0x80) && (gpu.DMA < 0xA0))
+                {
+                        // DMA is using VRAM bus
+                        if ((addr >= 0x8000) && (addr < 0xA000))
+                        {
+                                // if we're trying to write to the VRAM bus, we maybe overwrite the DMA?
+                                wb((gpu.DMA << 8) + gpu.DMA_ptr, val);
+                                printf("DMA VRAM bus conflict. Writing 0x%02hhx to 0x%04hx going to DMA instead\n", val, addr);
+                                return;
+                        }
+                        else
+                        {
+                                wb(addr, val);
+                                return;
+                        }
+                }
+                // DMA is using external bus
+                if ((addr >= 0x8000) && (addr < 0xA000))
+                {
+                        // if we're trying on the VRAM bus, we're good!
+                        wb(addr, val);
+                        return;
+                }
+                else
+                {
+                        if (addr >= 0xFF00)
+                        {
+                                wb(addr, val);
+                                return;
+                        }
+                        printf("DMA external bus conflict. Writing 0x%02hhx to 0x%04hx going to DMA instead\n", val, addr);
+                        if (gpu.DMA >= 0xE0)
+                        {
+                                wb((unsigned short)((gpu.DMA - 0x20) << 8) + gpu.DMA_ptr, val);
+                                return;
+                        }
+                        else
+                        {
+                                wb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr, val);
+                                return;
+                        }
+                }
+        }
+        wb(addr, val);
+}
+
 unsigned char rb(unsigned short addr)
 {
         switch (addr & 0xF000)
@@ -332,7 +432,7 @@ unsigned char rb(unsigned short addr)
                 case 0xE00:
                         if (addr < 0xFEA0)
                         {
-                                if (gpu.mode & 0x2)
+                                if ((gpu.mode & 0x2) || gpu.do_DMA)
                                         return 0xFF;
                                 return gpu.oam[addr & 0xFF];
                         }
@@ -812,7 +912,7 @@ void wb(unsigned short addr, unsigned char val)
                         case 0xFF46:
                                 gpu.DMA = val;
                                 // printf("DMA: %02x\n", val);
-                                gpu.do_DMA = true;
+                                gpu.DMA_requested = true;
                                 break;
                         case 0xFF47:
                                 gpu.bg_pal = val;

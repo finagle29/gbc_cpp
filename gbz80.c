@@ -100,7 +100,7 @@ int cpu_tick()
                         gpu_m_tick();
                         clock_m_tick();
                         // fetch next opcode
-                        z80.ir = rb(z80.pc++);
+                        z80.ir = rb_cpu(z80.pc++);
                 }
                 x = z80.ir >> 6;
                 y = (z80.ir >> 3) & 0x7;
@@ -148,7 +148,7 @@ int cpu_tick()
                                 }
                                 else
                                 {
-                                        SET_b_r(y, table_r[z]);
+                                        SET_b_r_t(y, table_r[z]);
                                 }
                                 break;
                         default:
@@ -494,6 +494,20 @@ int cpu_tick()
         {
                 z80.ime = false;
                 z80.new_ime = false;
+                z80.pc--;
+                gpu_m_tick();
+                clock_m_tick();
+
+                z80.sp--;
+                gpu_m_tick();
+                clock_m_tick();
+
+                wb_cpu(z80.sp, z80.pc >> 8);
+                z80.sp--;
+                gpu_m_tick();
+                clock_m_tick();
+
+                ints = z80.int_en & z80.int_f & 0x1F;
                 if (GET_BIT(ints, 0))
                 {
                         z80.int_f &= ~0x1;
@@ -523,6 +537,10 @@ int cpu_tick()
                         // printf("keypad IRQ\n");
                         // handle keypad interaction
                 }
+                else
+                {
+                        RST_IRQ_n_t(0x00);
+                }
                 // z80.clock.m += z80.m;
                 // z80.clock.t += z80.t;
         }
@@ -540,13 +558,13 @@ int fetch_dispatch_execute()
 
         if (!z80.halt)
         {
-                op = rb(z80.pc++);
+                op = rb_cpu(z80.pc++);
                 unsigned char prefix = 0;
 
                 if (op == 0xCB || op == 0xDD || op == 0xED || op == 0xFD)
                 {
                         prefix = op;
-                        op = rb(z80.pc++);
+                        op = rb_cpu(z80.pc++);
                 }
 
                 unsigned char n;
@@ -631,7 +649,7 @@ int fetch_dispatch_execute()
                                                 STOP();
                                                 break;
                                         case 3:
-                                                n = rb(z80.pc);
+                                                n = rb_cpu(z80.pc);
                                                 if (n == 0xFE)
                                                 {
                                                         // IE jumping in place
@@ -644,7 +662,7 @@ int fetch_dispatch_execute()
                                         case 5:
                                         case 6:
                                         case 7:
-                                                n = rb(z80.pc);
+                                                n = rb_cpu(z80.pc);
                                                 z80.pc++;
                                                 JR_cc_n(table_cc[y - 4](), (signed char)n);
                                                 break;
@@ -745,7 +763,7 @@ int fetch_dispatch_execute()
                                         }
                                         break;
                                 case 6:
-                                        n = rb(z80.pc);
+                                        n = rb_cpu(z80.pc);
                                         z80.pc++;
                                         if (table_r[y] == NULL)
                                         {
@@ -804,7 +822,7 @@ int fetch_dispatch_execute()
                                         }
                                         else if (table_r[z] == NULL)
                                         {
-                                                LD_r1_r2(table_r[y], rb(z80.hl), 2);
+                                                LD_r1_r2(table_r[y], rb_cpu(z80.hl), 2);
                                         }
                                         else
                                         {
@@ -835,22 +853,22 @@ int fetch_dispatch_execute()
                                                 RET_cc(table_cc[y]());
                                                 break;
                                         case 4:
-                                                n = rb(z80.pc);
+                                                n = rb_cpu(z80.pc);
                                                 z80.pc++;
                                                 LDH_n_A(n);
                                                 break;
                                         case 5:
-                                                n = rb(z80.pc);
+                                                n = rb_cpu(z80.pc);
                                                 z80.pc++;
                                                 ADD_SP_n((signed char)n);
                                                 break;
                                         case 6:
-                                                n = rb(z80.pc);
+                                                n = rb_cpu(z80.pc);
                                                 z80.pc++;
                                                 LDH_A_n(n);
                                                 break;
                                         case 7:
-                                                n = rb(z80.pc);
+                                                n = rb_cpu(z80.pc);
                                                 z80.pc++;
                                                 LDHL_SP_n((signed char)n);
                                                 break;
@@ -951,7 +969,7 @@ int fetch_dispatch_execute()
                                         }
                                         break;
                                 case 6:
-                                        n = rb(z80.pc);
+                                        n = rb_cpu(z80.pc);
                                         z80.pc++;
                                         table_alu[y](n, 2);
                                         break;
@@ -1197,14 +1215,14 @@ void LD_nn_n(unsigned char *r, unsigned char n)
 
 void LD_nn_n_t(unsigned char *r)
 {
-        z = rb(z80.pc);
-        z80.pc++;
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
+        z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
         *r = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1223,7 +1241,7 @@ void LD_r1_r2_t(unsigned char *r1, unsigned char r2)
 {
         PRINT_ASM();
         *r1 = r2;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1232,19 +1250,19 @@ void LD_r1_r2_t(unsigned char *r1, unsigned char r2)
 void LD_r1_HL_t(unsigned char *r1)
 {
         PRINT_ASM();
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         *r1 = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 }
 
 /* void LD_r1_HL(unsigned char *r1) {
-        *r1 = rb(z80.hl);
+        *r1 = rb_cpu(z80.hl);
 
         z80.m = 2;
         z80.t = 8;
@@ -1253,7 +1271,7 @@ void LD_r1_HL_t(unsigned char *r1)
 void LD_HL_r2(unsigned char r2)
 {
         PRINT_ASM();
-        wb(z80.hl, r2);
+        wb_cpu(z80.hl, r2);
 
         z80.m = 2;
         z80.t = 8;
@@ -1262,11 +1280,11 @@ void LD_HL_r2(unsigned char r2)
 void LD_HL_r2_t(unsigned char r2)
 {
         PRINT_ASM();
-        wb(z80.hl, r2);
+        wb_cpu(z80.hl, r2);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1275,7 +1293,7 @@ void LD_HL_r2_t(unsigned char r2)
 void LD_HL_n(unsigned char n)
 {
         PRINT_ASM(n);
-        wb(z80.hl, n);
+        wb_cpu(z80.hl, n);
 
         z80.m = 3;
         z80.t = 12;
@@ -1283,17 +1301,17 @@ void LD_HL_n(unsigned char n)
 
 void LD_HL_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1310,7 +1328,7 @@ void LD_HL_n_t()
 void LD_A_rb(unsigned short nn, unsigned char m_time)
 {
         PRINT_ASM(nn);
-        z80.a = rb(nn);
+        z80.a = rb_cpu(nn);
 
         z80.m = m_time;
         z80.t = 4 * m_time;
@@ -1318,23 +1336,23 @@ void LD_A_rb(unsigned short nn, unsigned char m_time)
 
 void LD_A_nn_t()
 {
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        PRINT_ASM((w << 8) | z);
-        z = rb((w << 8) | z);
+        z = rb_cpu((w << 8) | z);
         clock_m_tick();
         gpu_m_tick();
 
         z80.a = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1343,12 +1361,12 @@ void LD_A_nn_t()
 void LD_A_rp_t(unsigned short n)
 {
         PRINT_ASM(n);
-        z = rb(n);
+        z = rb_cpu(n);
         clock_m_tick();
         gpu_m_tick();
 
         z80.a = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1365,7 +1383,7 @@ void LD_A_rp_t(unsigned short n)
 void LD_wb_A(unsigned short n, unsigned char m_time)
 {
         PRINT_ASM(n);
-        wb(n, z80.a);
+        wb_cpu(n, z80.a);
 
         z80.m = m_time;
         z80.t = 4 * m_time;
@@ -1373,22 +1391,22 @@ void LD_wb_A(unsigned short n, unsigned char m_time)
 
 void LD_nn_A_t()
 {
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        PRINT_ASM((w << 8) | z);
-        wb((w << 8) | z, z80.a);
+        wb_cpu((w << 8) | z, z80.a);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1397,11 +1415,11 @@ void LD_nn_A_t()
 void LD_rp_A_t(unsigned short n)
 {
         PRINT_ASM(n);
-        wb(n, z80.a);
+        wb_cpu(n, z80.a);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1410,7 +1428,7 @@ void LD_rp_A_t(unsigned short n)
 void LD_A_C()
 {
         PRINT_ASM(0xFF00 + z80.c);
-        z80.a = rb(0xFF00 + z80.c);
+        z80.a = rb_cpu(0xFF00 + z80.c);
 
         z80.m = 2;
         z80.t = 8;
@@ -1419,12 +1437,12 @@ void LD_A_C()
 void LD_A_C_t()
 {
         PRINT_ASM(0xFF00 + z80.c);
-        z = rb(0xFF00 + z80.c);
+        z = rb_cpu(0xFF00 + z80.c);
         clock_m_tick();
         gpu_m_tick();
 
         z80.a = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1433,9 +1451,9 @@ void LD_A_C_t()
 void LD_C_A()
 {
         PRINT_ASM(0xFF00 + z80.c);
-        wb(0xFF00 + z80.c, z80.a);
+        wb_cpu(0xFF00 + z80.c, z80.a);
 
-        // assert(z80.a == rb(0xFF00 + z80.c));
+        // assert(z80.a == rb_cpu(0xFF00 + z80.c));
 
         z80.m = 2;
         z80.t = 8;
@@ -1444,11 +1462,11 @@ void LD_C_A()
 void LD_C_A_t()
 {
         PRINT_ASM(0xFF00 + z80.c);
-        wb(0xFF00 + z80.c, z80.a);
+        wb_cpu(0xFF00 + z80.c, z80.a);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1457,7 +1475,7 @@ void LD_C_A_t()
 void LDD_A_HL()
 {
         PRINT_ASM();
-        z80.a = rb(z80.hl);
+        z80.a = rb_cpu(z80.hl);
         z80.hl--;
 
         z80.m = 2;
@@ -1467,13 +1485,13 @@ void LDD_A_HL()
 void LDD_A_HL_t()
 {
         PRINT_ASM();
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         z80.hl--;
         clock_m_tick();
         gpu_m_tick();
 
         z80.a = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1482,7 +1500,7 @@ void LDD_A_HL_t()
 void LDD_HL_A()
 {
         PRINT_ASM();
-        wb(z80.hl, z80.a);
+        wb_cpu(z80.hl, z80.a);
         z80.hl--;
 
         z80.m = 2;
@@ -1492,12 +1510,12 @@ void LDD_HL_A()
 void LDD_HL_A_t()
 {
         PRINT_ASM();
-        wb(z80.hl, z80.a);
+        wb_cpu(z80.hl, z80.a);
         z80.hl--;
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1506,7 +1524,7 @@ void LDD_HL_A_t()
 void LDI_A_HL()
 {
         PRINT_ASM();
-        z80.a = rb(z80.hl);
+        z80.a = rb_cpu(z80.hl);
         z80.hl++;
 
         z80.m = 2;
@@ -1516,13 +1534,13 @@ void LDI_A_HL()
 void LDI_A_HL_t()
 {
         PRINT_ASM();
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         z80.hl++;
         clock_m_tick();
         gpu_m_tick();
 
         z80.a = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1531,7 +1549,7 @@ void LDI_A_HL_t()
 void LDI_HL_A()
 {
         PRINT_ASM();
-        wb(z80.hl, z80.a);
+        wb_cpu(z80.hl, z80.a);
         z80.hl++;
 
         z80.m = 2;
@@ -1541,12 +1559,12 @@ void LDI_HL_A()
 void LDI_HL_A_t()
 {
         PRINT_ASM();
-        wb(z80.hl, z80.a);
+        wb_cpu(z80.hl, z80.a);
         z80.hl++;
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1556,26 +1574,26 @@ void LDH_n_A(unsigned char n)
 {
         PRINT_ASM(n);
 
-        // assert(z80.a == rb(0xFF00 + n));
+        // assert(z80.a == rb_cpu(0xFF00 + n));
 
         z80.m = 3;
         z80.t = 12;
-        wb(0xFF00 + n, z80.a);
+        wb_cpu(0xFF00 + n, z80.a);
 }
 
 void LDH_n_A_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z, z80.a);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        wb(0xFF00 + z, z80.a);
+        wb_cpu(0xFF00 + z, z80.a);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         // printf("PC: %04hx\t IR: %02hhx\n", z80.pc, z80.ir);
         z80.pc++;
         clock_m_tick();
@@ -1584,7 +1602,7 @@ void LDH_n_A_t()
 
 void LDH_A_n(unsigned char n)
 {
-        z80.a = rb(0xFF00 + n);
+        z80.a = rb_cpu(0xFF00 + n);
         PRINT_ASM(n, z80.a);
         z80.m = 3;
         z80.t = 12;
@@ -1592,18 +1610,18 @@ void LDH_A_n(unsigned char n)
 
 void LDH_A_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
+        PRINT_ASM(rb(0xFF00 + z), z80.a);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        z = rb(0xFF00 + z);
+        z = rb_cpu(0xFF00 + z);
         clock_m_tick();
         gpu_m_tick();
 
-        PRINT_ASM(z, z80.a);
         z80.a = z;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1620,18 +1638,18 @@ void LD_n_nn(unsigned short *n, unsigned short nn)
 
 void LD_n_nn_t(unsigned short *n)
 {
-        z = rb(z80.pc);
-        PRINT_ASM(z);
+        z = rb_cpu(z80.pc);
+        PRINT_ASM(rw(z80.pc));
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         *n = (w << 8) | z;
         clock_m_tick();
@@ -1653,7 +1671,7 @@ void LD_SP_HL_t()
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1679,7 +1697,7 @@ void LDHL_SP_n(signed char n)
 
 void LDHL_SP_n_t()
 {
-        z_s = rb(z80.pc);
+        z_s = rb_cpu(z80.pc);
         PRINT_ASM(z_s);
         z80.pc++;
         clock_m_tick();
@@ -1689,13 +1707,13 @@ void LDHL_SP_n_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_HC_ADD(z80.sp & 0xFF, z_s);
         SET_C_ADD(z80.sp & 0xFF, z_s);
-        z80.l = (z80.sp & 0xFF) + z_s;
+        // z80.l = (z80.sp & 0xFF) + z_s;
         clock_m_tick();
         gpu_m_tick();
 
         // z80.h = (z80.sp >> 8) + GET_BIT(z80.f, CARRY);
         z80.hl = z80.sp + z_s;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1711,27 +1729,28 @@ void LD_nn_SP(unsigned short nn)
 
 void LD_nn_SP_t()
 {
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
+        z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-        z80.pc++;
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
+        z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-        z80.pc++;
 
         wz = (w << 8) | z;
-        wb(wz, z80.pc & 0xFF);
-        clock_m_tick();
-        gpu_m_tick();
+        wb_cpu(wz, z80.sp & 0xFF);
         wz++;
-
-        wb(wz, z80.pc >> 8);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        wb_cpu(wz, z80.sp >> 8);
+        clock_m_tick();
+        gpu_m_tick();
+
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1740,8 +1759,8 @@ void LD_nn_SP_t()
 void PUSH_nn(const unsigned short *nn)
 {
         PRINT_ASM();
-        wb(--z80.sp, (*nn >> 8) & 0xFF);
-        wb(--z80.sp, *nn & 0xFF);
+        wb_cpu(--z80.sp, (*nn >> 8) & 0xFF);
+        wb_cpu(--z80.sp, *nn & 0xFF);
         z80.m = 4;
         z80.t = 16;
 }
@@ -1753,17 +1772,16 @@ void PUSH_nn_t(const unsigned short *nn)
         clock_m_tick();
         gpu_m_tick();
 
-        wb(z80.sp, (*nn >> 8) & 0xFF);
+        wb_cpu(z80.sp, (*nn >> 8) & 0xFF);
         z80.sp--;
         clock_m_tick();
         gpu_m_tick();
 
-        wb(z80.sp, *nn & 0xFF);
-
+        wb_cpu(z80.sp, *nn & 0xFF);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1786,12 +1804,12 @@ void POP_nn(unsigned short *nn)
 void POP_nn_t(unsigned short *nn)
 {
         PRINT_ASM();
-        z = rb(z80.sp);
+        z = rb_cpu(z80.sp);
         z80.sp++;
         clock_m_tick();
         gpu_m_tick();
 
-        w = rb(z80.sp);
+        w = rb_cpu(z80.sp);
         z80.sp++;
         clock_m_tick();
         gpu_m_tick();
@@ -1799,7 +1817,7 @@ void POP_nn_t(unsigned short *nn)
         *nn = (w << 8) + z;
         if (nn == &z80.af)
                 *nn &= (0xFFF0);
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1822,7 +1840,7 @@ void ADD_A_n(unsigned char n, unsigned char m_time)
 
 void ADD_A_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -1835,7 +1853,7 @@ void ADD_A_n_t()
         z80.a += z;
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1843,7 +1861,7 @@ void ADD_A_n_t()
 
 void ADD_A_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -1855,7 +1873,7 @@ void ADD_A_HL_t()
         z80.a += z;
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1871,7 +1889,7 @@ void ADD_A_r_t(unsigned char n)
         z80.a += n;
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1895,7 +1913,7 @@ void ADC_A_n(unsigned char n, unsigned char m_time)
 
 void ADC_A_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -1910,7 +1928,7 @@ void ADC_A_n_t()
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1918,7 +1936,7 @@ void ADC_A_n_t()
 
 void ADC_A_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -1932,7 +1950,7 @@ void ADC_A_HL_t()
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1951,7 +1969,7 @@ void ADC_A_r_t(unsigned char n)
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1974,7 +1992,7 @@ void SUB_A_n(unsigned char n, unsigned char m_time)
 
 void SUB_A_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -1988,7 +2006,7 @@ void SUB_A_n_t()
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -1996,7 +2014,7 @@ void SUB_A_n_t()
 
 void SUB_A_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -2009,7 +2027,7 @@ void SUB_A_HL_t()
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2027,7 +2045,7 @@ void SUB_A_r_t(unsigned char n)
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2051,7 +2069,7 @@ void SBC_A_n(unsigned char n, unsigned char m_time)
 
 void SBC_A_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         unsigned char carry = GET_BIT(z80.f, CARRY);
@@ -2065,7 +2083,7 @@ void SBC_A_n_t()
         z80.a = 0xFF & (z80.a - z - carry);
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2073,9 +2091,8 @@ void SBC_A_n_t()
 
 void SBC_A_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
-        z80.pc++;
         unsigned char carry = GET_BIT(z80.f, CARRY);
         clock_m_tick();
         gpu_m_tick();
@@ -2087,7 +2104,7 @@ void SBC_A_HL_t()
         z80.a = 0xFF & (z80.a - z - carry);
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2105,7 +2122,7 @@ void SBC_A_r_t(unsigned char n)
         z80.a = 0xFF & (z80.a - n - carry);
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2128,7 +2145,7 @@ void AND_n(unsigned char n, unsigned char m_time)
 
 void AND_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -2142,7 +2159,7 @@ void AND_n_t()
         SET_Z_RES(z80.a);
         BIT_SET(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2150,7 +2167,7 @@ void AND_n_t()
 
 void AND_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -2163,7 +2180,7 @@ void AND_HL_t()
         SET_Z_RES(z80.a);
         BIT_SET(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2181,7 +2198,7 @@ void AND_r_t(unsigned char n)
         SET_Z_RES(z80.a);
         BIT_SET(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2201,7 +2218,7 @@ void OR_n(unsigned char n, unsigned char m_time)
 
 void OR_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -2211,7 +2228,7 @@ void OR_n_t()
 
         z80.f &= ~0x7F;
         SET_Z_RES(z80.a);
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2219,7 +2236,7 @@ void OR_n_t()
 
 void OR_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -2228,7 +2245,7 @@ void OR_HL_t()
 
         z80.f &= ~0x7F;
         SET_Z_RES(z80.a);
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2242,7 +2259,7 @@ void OR_r_t(unsigned char n)
 
         z80.f &= ~0x7F;
         SET_Z_RES(z80.a);
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2264,7 +2281,7 @@ void XOR_n(unsigned char n, unsigned char m_time)
 
 void XOR_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -2277,7 +2294,7 @@ void XOR_n_t()
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2285,7 +2302,7 @@ void XOR_n_t()
 
 void XOR_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -2297,7 +2314,7 @@ void XOR_HL_t()
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2314,7 +2331,7 @@ void XOR_r_t(unsigned char n)
 
         SET_Z_RES(z80.a);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2337,7 +2354,7 @@ void CP_n(unsigned char n, unsigned char m_time)
 
 void CP_n_t()
 {
-        z = rb(z80.pc);
+        z = rb_cpu(z80.pc);
         PRINT_ASM(z);
         z80.pc++;
         clock_m_tick();
@@ -2351,7 +2368,7 @@ void CP_n_t()
         SET_Z_RES(z80.a);
         z80.a += z;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2359,7 +2376,7 @@ void CP_n_t()
 
 void CP_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
@@ -2372,7 +2389,7 @@ void CP_HL_t()
         SET_Z_RES(z80.a);
         z80.a += z;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2390,7 +2407,7 @@ void CP_r_t(unsigned char n)
         SET_Z_RES(z80.a);
         z80.a += n;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2419,10 +2436,8 @@ void INC_n_t(unsigned char *n)
         // SET_HC_ADD(*n, 1);
         (*n)++;
         SET_Z_RES(*n);
-        clock_m_tick();
-        gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2430,13 +2445,13 @@ void INC_n_t(unsigned char *n)
 
 void INC_HL()
 {
-        unsigned char tmp = rb(z80.hl);
+        unsigned char tmp = rb_cpu(z80.hl);
         PRINT_ASM(tmp);
 
         SET_HC_ADD(tmp, 1);
         tmp += 1;
 
-        wb(z80.hl, tmp);
+        wb_cpu(z80.hl, tmp);
 
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_Z_RES(tmp);
@@ -2447,20 +2462,20 @@ void INC_HL()
 
 void INC_HL_t()
 {
-        z = rb(z80.hl);
+        z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
 
         SET_HC_ADD(z, 1);
         z++;
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_Z_RES(z);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2487,10 +2502,8 @@ void DEC_n_t(unsigned char *n)
         // SET_HC_SUB(*n, 1);
         (*n)--;
         SET_Z_RES(*n);
-        clock_m_tick();
-        gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2498,12 +2511,12 @@ void DEC_n_t(unsigned char *n)
 
 void DEC_HL()
 {
-        unsigned char tmp = rb(z80.hl);
+        unsigned char tmp = rb_cpu(z80.hl);
         PRINT_ASM(tmp);
 
         SET_HC_SUB(tmp, 1);
         tmp -= 1;
-        wb(z80.hl, tmp);
+        wb_cpu(z80.hl, tmp);
 
         BIT_SET(z80.f, SUBTRACT);
         SET_Z_RES(tmp);
@@ -2514,20 +2527,20 @@ void DEC_HL()
 
 void DEC_HL_t()
 {
-        unsigned char z = rb(z80.hl);
+        unsigned char z = rb_cpu(z80.hl);
         PRINT_ASM(z);
         clock_m_tick();
         gpu_m_tick();
 
         SET_HC_SUB(z, 1);
         z--;
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         BIT_SET(z80.f, SUBTRACT);
         SET_Z_RES(z);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2554,21 +2567,20 @@ void ADD_HL_n_t(const unsigned short *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_HC_ADD(z80.l, *n & 0xFF);
         SET_C_ADD(z80.l, *n & 0xFF);
-        z80.l += (*n & 0xFF);
+        // z80.l += (*n & 0xFF);
         clock_m_tick();
         gpu_m_tick();
 
         z = z80.h + (*n >> 8) + GET_BIT(z80.f, CARRY);
         BIT_CLEAR(z80.f, SUBTRACT);
-        // SET_HC_ADD_16(z80.hl, *n);
-        // SET_C_ADD_16(z80.hl, *n);
-        SET_HC_ADD(z80.h, (*n >> 8) + GET_BIT(z80.f, CARRY));
-        SET_C_ADD(z80.h, (*n >> 8) + GET_BIT(z80.f, CARRY));
-        z80.h = z;
-        clock_m_tick();
-        gpu_m_tick();
+        SET_HC_ADD_16(z80.hl, *n);
+        SET_C_ADD_16(z80.hl, *n);
+        // SET_HC_ADD(z80.h, (*n >> 8) + GET_BIT(z80.f, CARRY));
+        // SET_C_ADD(z80.h, (*n >> 8) + GET_BIT(z80.f, CARRY));
+        // z80.h = z;
+        z80.hl += *n;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2590,7 +2602,9 @@ void ADD_SP_n(signed char n)
 
 void ADD_SP_n_t()
 {
-        z_s = rb(z80.pc);
+        printf("ADD SP e\tDMA: %d\tDMA_ptr: %d\t\n", gpu.do_DMA, gpu.DMA_ptr);
+        z_s = rb_cpu(z80.pc);
+        printf("ADD SP %02hhx\n", z_s);
         PRINT_ASM(z_s);
         z80.pc++;
         clock_m_tick();
@@ -2607,7 +2621,7 @@ void ADD_SP_n_t()
         gpu_m_tick();
 
         z80.sp += z_s;
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2629,7 +2643,7 @@ void INC_nn_t(unsigned short *nn)
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2651,7 +2665,7 @@ void DEC_nn_t(unsigned short *nn)
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2690,7 +2704,7 @@ void SWAP_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         SET_Z_RES(tmp);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2700,12 +2714,12 @@ void SWAP_HL()
 {
         PRINT_ASM_CB();
         unsigned char tmp = 0, val;
-        val = rb(z80.hl);
+        val = rb_cpu(z80.hl);
 
         tmp |= (val >> 4) & 0x0F;
         tmp |= (val << 4) & 0xF0;
 
-        wb(z80.hl, tmp);
+        wb_cpu(z80.hl, tmp);
 
         BIT_CLEAR(z80.f, CARRY);
         BIT_CLEAR(z80.f, HALF_CARRY);
@@ -2720,13 +2734,13 @@ void SWAP_HL_t()
 {
         PRINT_ASM_CB();
         unsigned char tmp = 0, val;
-        val = rb(z80.hl);
+        val = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         tmp |= (val >> 4) & 0x0F;
         tmp |= (val << 4) & 0xF0;
-        wb(z80.hl, tmp);
+        wb_cpu(z80.hl, tmp);
         BIT_CLEAR(z80.f, CARRY);
         BIT_CLEAR(z80.f, HALF_CARRY);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -2734,7 +2748,7 @@ void SWAP_HL_t()
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2804,7 +2818,7 @@ void DAA_t()
         SET_Z_RES(z80.a);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2828,7 +2842,7 @@ void CPL_t()
         BIT_SET(z80.f, SUBTRACT);
         BIT_SET(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2852,7 +2866,7 @@ void CCF_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2876,7 +2890,7 @@ void SCF_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -2892,7 +2906,7 @@ void NOP()
 void NOP_t()
 {
         PRINT_ASM();
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -2912,7 +2926,7 @@ void HALT_t()
         PRINT_ASM();
         z80.halt = true;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         gpu_m_tick();
         clock_m_tick();
 }
@@ -2952,7 +2966,7 @@ void DI_t()
         z80.ime = false;
         z80.new_ime = false;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -2974,7 +2988,7 @@ void EI_t()
         PRINT_ASM();
         z80.new_ime = true;
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -3004,7 +3018,7 @@ void RLCA_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3036,7 +3050,7 @@ void RLA_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3066,7 +3080,7 @@ void RRCA_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3098,7 +3112,7 @@ void RRA_t()
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3128,7 +3142,7 @@ void RLC_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3137,9 +3151,9 @@ void RLC_n_t(unsigned char *n)
 void RLC_HL()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
         val = (unsigned char)((val << 1) | (val >> 7));
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 0));
 
@@ -3154,12 +3168,12 @@ void RLC_HL()
 void RLC_HL_t()
 {
         PRINT_ASM_CB();
-        unsigned char z = rb(z80.hl);
+        unsigned char z = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         z = (unsigned char)((z << 1) | (z >> 7));
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z, 0));
         SET_Z_RES(z);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3167,7 +3181,7 @@ void RLC_HL_t()
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3199,7 +3213,7 @@ void RL_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3209,11 +3223,11 @@ void RL_HL()
 {
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
         val = (unsigned char)((0xFF & (val << 1)) | old_carry);
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3227,20 +3241,20 @@ void RL_HL_t()
 {
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        unsigned char z = rb(z80.hl);
+        unsigned char z = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z, 7));
         z = (unsigned char)((0xFF & (z << 1)) | old_carry);
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         SET_Z_RES(z);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3269,7 +3283,7 @@ void RRC_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3278,20 +3292,20 @@ void RRC_n_t(unsigned char *n)
 void RRC_HL_t()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         val = (unsigned char)((val >> 1) | (val << 7));
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3300,11 +3314,11 @@ void RRC_HL_t()
 void RRC_HL()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
 
         val = (unsigned char)((val >> 1) | (val << 7));
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3340,7 +3354,7 @@ void RR_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3350,10 +3364,10 @@ void RR_HL()
 {
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
         BIT_EQUAL(z80.f, CARRY, val & 1);
         val = (unsigned char)((val >> 1) | (old_carry << 7));
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3367,20 +3381,20 @@ void RR_HL_t()
 {
         PRINT_ASM_CB();
         unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        unsigned char z = rb(z80.hl);
+        unsigned char z = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_EQUAL(z80.f, CARRY, z & 1);
         z = (unsigned char)((z >> 1) | (old_carry << 7));
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         SET_Z_RES(z);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3410,7 +3424,7 @@ void SLA_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3419,11 +3433,11 @@ void SLA_n_t(unsigned char *n)
 void SLA_HL()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
         val = (unsigned char)(val << 1);
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3436,20 +3450,20 @@ void SLA_HL()
 void SLA_HL_t()
 {
         PRINT_ASM_CB();
-        unsigned char z = rb(z80.hl);
+        unsigned char z = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z, 7));
         z = (unsigned char)(z << 1);
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         SET_Z_RES(z);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3479,7 +3493,7 @@ void SRA_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3488,10 +3502,10 @@ void SRA_n_t(unsigned char *n)
 void SRA_HL()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
         BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 0));
         val = (unsigned char)(((signed char)val) >> 1);
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3504,20 +3518,20 @@ void SRA_HL()
 void SRA_HL_t()
 {
         PRINT_ASM_CB();
-        unsigned char z = rb(z80.hl);
+        unsigned char z = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_EQUAL(z80.f, CARRY, GET_BIT(z, 0));
         z = (unsigned char)(((signed char)z) >> 1);
-        wb(z80.hl, z);
+        wb_cpu(z80.hl, z);
         SET_Z_RES(z);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3551,7 +3565,7 @@ void SRL_n_t(unsigned char *n)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3560,12 +3574,12 @@ void SRL_n_t(unsigned char *n)
 void SRL_HL()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
         BIT_EQUAL(z80.f, CARRY, val & 0x1);
         val = (unsigned char)(val >> 1);
 
         assert(GET_BIT(val, 7) == 0);
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
 
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
@@ -3578,21 +3592,21 @@ void SRL_HL()
 void SRL_HL_t()
 {
         PRINT_ASM_CB();
-        unsigned char val = rb(z80.hl);
+        unsigned char val = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_EQUAL(z80.f, CARRY, val & 0x1);
         val = (unsigned char)(val >> 1);
         // assert(GET_BIT(val, 7) == 0);
-        wb(z80.hl, val);
+        wb_cpu(z80.hl, val);
         SET_Z_RES(val);
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_CLEAR(z80.f, HALF_CARRY);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3617,7 +3631,7 @@ void BIT_b_r_t(unsigned char b, unsigned char r)
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_SET(z80.f, HALF_CARRY);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3626,7 +3640,7 @@ void BIT_b_r_t(unsigned char b, unsigned char r)
 void BIT_b_HL(unsigned char b)
 {
         PRINT_ASM_CB(b);
-        unsigned char r = rb(z80.hl);
+        unsigned char r = rb_cpu(z80.hl);
         BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_SET(z80.f, HALF_CARRY);
@@ -3638,14 +3652,14 @@ void BIT_b_HL(unsigned char b)
 void BIT_b_HL_t(unsigned char b)
 {
         PRINT_ASM_CB(b);
-        unsigned char r = rb(z80.hl);
+        unsigned char r = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
         BIT_CLEAR(z80.f, SUBTRACT);
         BIT_SET(z80.f, HALF_CARRY);
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3665,7 +3679,7 @@ void SET_b_r_t(unsigned char b, unsigned char *r)
         PRINT_ASM_CB(b);
         BIT_SET(*r, b);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3674,9 +3688,9 @@ void SET_b_r_t(unsigned char b, unsigned char *r)
 void SET_b_HL(unsigned char b)
 {
         PRINT_ASM_CB(b);
-        unsigned char r = rb(z80.hl);
+        unsigned char r = rb_cpu(z80.hl);
         BIT_SET(r, b);
-        wb(z80.hl, r);
+        wb_cpu(z80.hl, r);
 
         z80.m = 4;
         z80.t = 16;
@@ -3685,16 +3699,16 @@ void SET_b_HL(unsigned char b)
 void SET_b_HL_t(unsigned char b)
 {
         PRINT_ASM_CB(b);
-        unsigned char r = rb(z80.hl);
+        unsigned char r = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_SET(r, b);
-        wb(z80.hl, r);
+        wb_cpu(z80.hl, r);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3714,7 +3728,7 @@ void RES_b_r_t(unsigned char b, unsigned char *r)
         PRINT_ASM_CB(b);
         BIT_CLEAR(*r, b);
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3723,9 +3737,9 @@ void RES_b_r_t(unsigned char b, unsigned char *r)
 void RES_b_HL(unsigned char b)
 {
         PRINT_ASM_CB(b);
-        unsigned char r = rb(z80.hl);
+        unsigned char r = rb_cpu(z80.hl);
         BIT_CLEAR(r, b);
-        wb(z80.hl, r);
+        wb_cpu(z80.hl, r);
 
         z80.m = 4;
         z80.t = 16;
@@ -3734,16 +3748,16 @@ void RES_b_HL(unsigned char b)
 void RES_b_HL_t(unsigned char b)
 {
         PRINT_ASM_CB(b);
-        unsigned char r = rb(z80.hl);
+        unsigned char r = rb_cpu(z80.hl);
         clock_m_tick();
         gpu_m_tick();
 
         BIT_CLEAR(r, b);
-        wb(z80.hl, r);
+        wb_cpu(z80.hl, r);
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -3762,23 +3776,22 @@ void JP_nn(unsigned short nn)
 
 void JP_nn_t()
 {
-
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
-        PRINT_ASM((w << 8) | z);
 
         z80.pc = (w << 8) | z;
         gpu_m_tick();
         clock_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -3800,31 +3813,31 @@ void JP_cc_nn(bool cc, unsigned short nn)
 
 void JP_cc_nn_t(bool cc)
 {
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 
-        PRINT_ASM((w << 8) | z);
         if (cc)
         {
                 z80.pc = (w << 8) | z;
                 gpu_m_tick();
                 clock_m_tick();
 
-                z80.ir = rb(z80.pc);
+                z80.ir = rb_cpu(z80.pc);
                 z80.pc++;
                 gpu_m_tick();
                 clock_m_tick();
         }
         else
         {
-                z80.ir = rb(z80.pc);
+                z80.ir = rb_cpu(z80.pc);
                 z80.pc++;
                 gpu_m_tick();
                 clock_m_tick();
@@ -3843,7 +3856,7 @@ void JP_HL()
 void JP_HL_t()
 {
         PRINT_ASM();
-        z80.ir = rb(z80.hl);
+        z80.ir = rb_cpu(z80.hl);
         z80.pc = z80.hl + 1;
         gpu_m_tick();
         clock_m_tick();
@@ -3861,7 +3874,7 @@ void JR_n(signed char n)
 void JR_n_t()
 {
 
-        z_s = rb(z80.pc);
+        z_s = rb_cpu(z80.pc);
         PRINT_ASM(z_s);
         z80.pc++;
         gpu_m_tick();
@@ -3871,7 +3884,7 @@ void JR_n_t()
         gpu_m_tick();
         clock_m_tick();
 
-        z80.ir = rb(wz);
+        z80.ir = rb_cpu(wz);
         z80.pc = wz + 1;
         gpu_m_tick();
         clock_m_tick();
@@ -3893,7 +3906,7 @@ void JR_cc_n(bool cc, signed char n)
 
 void JR_cc_n_t(bool cc)
 {
-        z_s = rb(z80.pc);
+        z_s = rb_cpu(z80.pc);
         PRINT_ASM(z_s);
         z80.pc++;
         gpu_m_tick();
@@ -3905,14 +3918,14 @@ void JR_cc_n_t(bool cc)
                 gpu_m_tick();
                 clock_m_tick();
 
-                z80.ir = rb(wz);
+                z80.ir = rb_cpu(wz);
                 z80.pc = wz + 1;
                 gpu_m_tick();
                 clock_m_tick();
         }
         else
         {
-                z80.ir = rb(z80.pc);
+                z80.ir = rb_cpu(z80.pc);
                 z80.pc++;
                 gpu_m_tick();
                 clock_m_tick();
@@ -3934,33 +3947,32 @@ void CALL_nn(unsigned short nn)
 
 void CALL_nn_t()
 {
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
-
-        PRINT_ASM((w << 8) | z);
 
         z80.sp--;
         gpu_m_tick();
         clock_m_tick();
 
-        wb(z80.sp, z80.pc >> 8);
+        wb_cpu(z80.sp, z80.pc >> 8);
         z80.sp--;
         gpu_m_tick();
         clock_m_tick();
 
-        wb(z80.sp, z80.pc & 0xFF);
+        wb_cpu(z80.sp, z80.pc & 0xFF);
         z80.pc = (w << 8) | z;
         gpu_m_tick();
         clock_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -3986,35 +3998,35 @@ void CALL_cc_nn(bool cc, unsigned short nn)
 
 void CALL_cc_nn_t(bool cc)
 {
-        z = rb(z80.pc);
+        PRINT_ASM(rw(z80.pc));
+        z = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 
-        w = rb(z80.pc);
+        w = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 
-        PRINT_ASM((w << 8) | z);
         if (cc)
         {
                 z80.sp--;
                 gpu_m_tick();
                 clock_m_tick();
 
-                wb(z80.sp, z80.pc >> 8);
+                wb_cpu(z80.sp, z80.pc >> 8);
                 z80.sp--;
                 gpu_m_tick();
                 clock_m_tick();
 
-                wb(z80.sp, z80.pc & 0xFF);
+                wb_cpu(z80.sp, z80.pc & 0xFF);
                 z80.pc = (w << 8) | z;
                 gpu_m_tick();
                 clock_m_tick();
         }
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -4039,17 +4051,17 @@ void RST_n_t(unsigned char n)
         gpu_m_tick();
         clock_m_tick();
 
-        wb(z80.sp, z80.pc >> 8);
+        wb_cpu(z80.sp, z80.pc >> 8);
         z80.sp--;
         gpu_m_tick();
         clock_m_tick();
 
-        wb(z80.sp, z80.pc & 0xFF);
+        wb_cpu(z80.sp, z80.pc & 0xFF);
         z80.pc = n;
         gpu_m_tick();
         clock_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -4071,25 +4083,12 @@ void RST_IRQ_n_t(unsigned char irq)
 #ifdef DEBUG
         printf("0x%04x RST %02x\n", z80.pc, irq);
 #endif
-        z80.pc--;
-        gpu_m_tick();
-        clock_m_tick();
-
-        z80.sp--;
-        gpu_m_tick();
-        clock_m_tick();
-
-        wb(z80.sp, z80.pc >> 8);
-        z80.sp--;
-        gpu_m_tick();
-        clock_m_tick();
-
-        wb(z80.sp, z80.pc & 0xFF);
+        wb_cpu(z80.sp, z80.pc & 0xFF);
         z80.pc = irq;
         gpu_m_tick();
         clock_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
@@ -4154,12 +4153,12 @@ void RET()
 void RET_t()
 {
         PRINT_ASM();
-        z = rb(z80.sp);
+        z = rb_cpu(z80.sp);
         z80.sp++;
         clock_m_tick();
         gpu_m_tick();
 
-        w = rb(z80.sp);
+        w = rb_cpu(z80.sp);
         z80.sp++;
         clock_m_tick();
         gpu_m_tick();
@@ -4168,7 +4167,7 @@ void RET_t()
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
@@ -4199,12 +4198,12 @@ void RET_cc_t(bool cc)
         gpu_m_tick();
         if (cc)
         {
-                z = rb(z80.sp);
+                z = rb_cpu(z80.sp);
                 z80.sp++;
                 clock_m_tick();
                 gpu_m_tick();
 
-                w = rb(z80.sp);
+                w = rb_cpu(z80.sp);
                 z80.sp++;
                 clock_m_tick();
                 gpu_m_tick();
@@ -4212,19 +4211,11 @@ void RET_cc_t(bool cc)
                 z80.pc = (w << 8) | z;
                 clock_m_tick();
                 gpu_m_tick();
-
-                z80.ir = rb(z80.pc);
-                z80.pc++;
-                clock_m_tick();
-                gpu_m_tick();
         }
-        else
-        {
-                z80.ir = rb(z80.pc);
-                z80.pc++;
-                clock_m_tick();
-                gpu_m_tick();
-        }
+        z80.ir = rb_cpu(z80.pc);
+        z80.pc++;
+        clock_m_tick();
+        gpu_m_tick();
 }
 
 void RETI()
@@ -4241,12 +4232,12 @@ void RETI()
 void RETI_t()
 {
         PRINT_ASM();
-        z = rb(z80.sp);
+        z = rb_cpu(z80.sp);
         z80.sp++;
         clock_m_tick();
         gpu_m_tick();
 
-        w = rb(z80.sp);
+        w = rb_cpu(z80.sp);
         z80.sp++;
         clock_m_tick();
         gpu_m_tick();
@@ -4256,7 +4247,7 @@ void RETI_t()
         clock_m_tick();
         gpu_m_tick();
 
-        z80.ir = rb(z80.pc);
+        z80.ir = rb_cpu(z80.pc);
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
