@@ -33,7 +33,7 @@
 #define SET_HC_ADD_16(a, b) BIT_EQUAL(z80.f, HALF_CARRY, (((a)&0xFFF) + ((b)&0xFFF)) >> 12)
 #define SET_C_ADD_16(a, b) BIT_EQUAL(z80.f, CARRY, ((unsigned long)(a) + (unsigned long)(b)) > 0xFFFF)
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #define PRINT_ASM(...)    \
@@ -51,8 +51,6 @@ void init_z80(void);
 void reset(void);
 int cpu_tick(void);
 void clock_m_tick(void);
-int fetch_dispatch_execute(void);
-void fetch_dispatch_execute_loop(void);
 void scramble_z80(void);
 void update_clock(void);
 void check_timer(void);
@@ -135,23 +133,6 @@ extern gbz80_type *z80_p;
 /* Function prototypes */
 
 /* 8-bit loads */
-void LD_nn_n(unsigned char *r, unsigned char n);
-void LD_HL_n(unsigned char n);
-void LD_r1_r2(unsigned char *r1, unsigned char r2, unsigned char m_time);
-void LD_HL_r2(unsigned char r2);
-void LD_A_n(unsigned char *n, unsigned char m_time);
-void LD_A_rb(unsigned short nn, unsigned char m_time);
-void LD_n_A(unsigned char *n, unsigned char m_time);
-void LD_wb_A(unsigned short nn, unsigned char m_time);
-void LD_A_C(void);
-void LD_C_A(void);
-void LDD_A_HL(void);
-void LDD_HL_A(void);
-void LDI_A_HL(void);
-void LDI_HL_A(void);
-void LDH_n_A(unsigned char n);
-void LDH_A_n(unsigned char n);
-
 void LD_nn_n_t(unsigned char *r);
 void LD_HL_n_t(void);
 void LD_r1_r2_t(unsigned char *r1, unsigned char r2);
@@ -171,13 +152,6 @@ void LDH_n_A_t(void);
 void LDH_A_n_t(void);
 
 /* 16-bit loads */
-void LD_n_nn(unsigned short *n, unsigned short nn);
-void LD_SP_HL(void);
-void LDHL_SP_n(signed char n);
-void LD_nn_SP(unsigned short nn);
-void PUSH_nn(const unsigned short *nn);
-void POP_nn(unsigned short *nn);
-
 void LD_n_nn_t(unsigned short *n);
 void LD_SP_HL_t(void);
 void LDHL_SP_n_t();
@@ -186,19 +160,6 @@ void PUSH_nn_t(const unsigned short *nn);
 void POP_nn_t(unsigned short *nn);
 
 /* 8-bit ALU */
-void ADD_A_n(unsigned char n, unsigned char m_time);
-void ADC_A_n(unsigned char n, unsigned char m_time);
-void SUB_A_n(unsigned char n, unsigned char m_time);
-void SBC_A_n(unsigned char n, unsigned char m_time);
-void AND_n(unsigned char n, unsigned char m_time);
-void OR_n(unsigned char n, unsigned char m_time);
-void XOR_n(unsigned char n, unsigned char m_time);
-void CP_n(unsigned char n, unsigned char m_time);
-void INC_n(unsigned char *n);
-void INC_HL(void);
-void DEC_n(unsigned char *n);
-void DEC_HL(void);
-
 void ADD_A_n_t(void);
 void ADD_A_HL_t(void);
 void ADD_A_r_t(unsigned char n);
@@ -229,29 +190,12 @@ void DEC_n_t(unsigned char *n);
 void DEC_HL_t(void);
 
 /* 16-bit ALU */
-void ADD_HL_n(const unsigned short *n);
-void ADD_SP_n(signed char n);
-void INC_nn(unsigned short *nn);
-void DEC_nn(unsigned short *nn);
-
 void ADD_HL_n_t(const unsigned short *n);
 void ADD_SP_n_t(void);
 void INC_nn_t(unsigned short *nn);
 void DEC_nn_t(unsigned short *nn);
 
 /* Misc */
-void SWAP_n(unsigned char *n);
-void SWAP_HL(void);
-void DAA(void);
-void CPL(void);
-void CCF(void);
-void SCF(void);
-void NOP(void);
-void HALT(void);
-void STOP(void);
-void DI(void);
-void EI(void);
-
 void SWAP_n_t(unsigned char *n);
 void SWAP_HL_t(void);
 void DAA_t(void);
@@ -265,25 +209,6 @@ void DI_t(void);
 void EI_t(void);
 
 /* Rotates & Shifts */
-void RLCA(void);
-void RLA(void);
-void RRCA(void);
-void RRA(void);
-void RLC_n(unsigned char *n);
-void RLC_HL(void);
-void RL_n(unsigned char *n);
-void RL_HL(void);
-void RRC_n(unsigned char *n);
-void RRC_HL(void);
-void RR_n(unsigned char *n);
-void RR_HL(void);
-void SLA_n(unsigned char *n);
-void SLA_HL(void);
-void SRA_n(unsigned char *n);
-void SRA_HL(void);
-void SRL_n(unsigned char *n);
-void SRL_HL(void);
-
 void RLCA_t(void);
 void RLA_t(void);
 void RRCA_t(void);
@@ -304,13 +229,6 @@ void SRL_n_t(unsigned char *n);
 void SRL_HL_t(void);
 
 /* Bit Opcodes */
-void BIT_b_r(unsigned char b, unsigned char r);
-void BIT_b_HL(unsigned char b);
-void SET_b_r(unsigned char b, unsigned char *r);
-void SET_b_HL(unsigned char b);
-void RES_b_r(unsigned char b, unsigned char *r);
-void RES_b_HL(unsigned char b);
-
 void BIT_b_r_t(unsigned char b, unsigned char r);
 void BIT_b_HL_t(unsigned char b);
 void SET_b_r_t(unsigned char b, unsigned char *r);
@@ -319,12 +237,6 @@ void RES_b_r_t(unsigned char b, unsigned char *r);
 void RES_b_HL_t(unsigned char b);
 
 /* Jumps */
-void JP_nn(unsigned short nn);
-void JP_cc_nn(bool cc, unsigned short nn);
-void JP_HL(void);
-void JR_n(signed char n);
-void JR_cc_n(bool cc, signed char n);
-
 void JP_nn_t();
 void JP_cc_nn_t(bool cc);
 void JP_HL_t(void);
@@ -332,29 +244,14 @@ void JR_n_t();
 void JR_cc_n_t(bool cc);
 
 /* Calls */
-void CALL_nn(unsigned short nn);
-void CALL_cc_nn(bool cc, unsigned short nn);
-
 void CALL_nn_t();
 void CALL_cc_nn_t(bool cc);
 
 /* Restarts */
-void RST_n(unsigned char n);
 void RST_n_t(unsigned char n);
-
-void RST40(void);
-void RST48(void);
-void RST50(void);
-void RST58(void);
-void RST60(void);
-
 void RST_IRQ_n_t(unsigned char irq);
 
 /* Returns */
-void RET(void);
-void RET_cc(bool cc);
-void RETI(void);
-
 void RET_t(void);
 void RET_cc_t(bool cc);
 void RETI_t(void);
@@ -369,12 +266,9 @@ static unsigned short *table_rp[4];
 static unsigned short *table_rp2[4];
 
 static bool (*table_cc[4])(void);
-static void (*table_alu[8])(unsigned char, unsigned char);
 static void (*table_alu_r_t[8])(unsigned char);
 static void (*table_alu_n_t[8])(void);
 static void (*table_alu_hl_t[8])(void);
-static void (*table_rot[8])(unsigned char *);
-static void (*table_rot_HL[8])(void);
 static void (*table_rot_t[8])(unsigned char *);
 static void (*table_rot_HL_t[8])(void);
 

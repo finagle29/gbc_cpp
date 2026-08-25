@@ -75,14 +75,6 @@ void printerr(unsigned char opcode)
         fprintf(stderr, "Oops! Something went wrong with opcode %c", opcode);
 }
 
-void fetch_dispatch_execute_loop()
-{
-        while (!z80.halt)
-        {
-                fetch_dispatch_execute();
-        }
-}
-
 int cpu_tick()
 {
         unsigned char prefix = 0;
@@ -551,511 +543,6 @@ int cpu_tick()
         return 1;
 }
 
-int fetch_dispatch_execute()
-{
-
-        int cycles = 0;
-
-        if (!z80.halt)
-        {
-                op = rb_cpu(z80.pc++);
-                unsigned char prefix = 0;
-
-                if (op == 0xCB || op == 0xDD || op == 0xED || op == 0xFD)
-                {
-                        prefix = op;
-                        op = rb_cpu(z80.pc++);
-                }
-
-                unsigned char n;
-                unsigned short nn;
-
-                unsigned char x, y, z, p, q;
-
-                x = op >> 6;
-                y = (op >> 3) & 0x7;
-                z = op & 0x7;
-                p = y >> 1;
-                q = y % 2;
-
-                if (prefix)
-                {
-                        switch (x)
-                        {
-                        case 0:
-                                if (table_r[z] == NULL)
-                                {
-                                        table_rot_HL[y]();
-                                }
-                                else
-                                {
-                                        table_rot[y](table_r[z]);
-                                }
-                                break;
-                        case 1:
-                                if (table_r[z] == NULL)
-                                {
-                                        BIT_b_HL(y);
-                                }
-                                else
-                                {
-                                        BIT_b_r(y, *table_r[z]);
-                                }
-                                break;
-                        case 2:
-                                if (table_r[z] == NULL)
-                                {
-                                        RES_b_HL(y);
-                                }
-                                else
-                                {
-                                        RES_b_r(y, table_r[z]);
-                                }
-                                break;
-                        case 3:
-                                if (table_r[z] == NULL)
-                                {
-                                        SET_b_HL(y);
-                                }
-                                else
-                                {
-                                        SET_b_r(y, table_r[z]);
-                                }
-                                break;
-                        default:
-                                printerr(op);
-                        }
-                }
-                else
-                {
-
-                        switch (x)
-                        {
-                        case 0:
-                                switch (z)
-                                {
-                                case 0:
-                                        switch (y)
-                                        {
-                                        case 0:
-                                                NOP();
-                                                break;
-                                        case 1:
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                LD_nn_SP(nn);
-                                                break;
-                                        case 2:
-                                                STOP();
-                                                break;
-                                        case 3:
-                                                n = rb_cpu(z80.pc);
-                                                if (n == 0xFE)
-                                                {
-                                                        // IE jumping in place
-                                                        return 0;
-                                                }
-                                                z80.pc++;
-                                                JR_n((signed char)n);
-                                                break;
-                                        case 4:
-                                        case 5:
-                                        case 6:
-                                        case 7:
-                                                n = rb_cpu(z80.pc);
-                                                z80.pc++;
-                                                JR_cc_n(table_cc[y - 4](), (signed char)n);
-                                                break;
-                                        default:
-                                                printerr(op);
-                                        };
-                                        break;
-                                case 1:
-                                        if (!q)
-                                        {
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                LD_n_nn(table_rp[p], nn);
-                                        }
-                                        else
-                                        {
-                                                ADD_HL_n(table_rp[p]);
-                                        }
-                                        break;
-                                case 2:
-                                        if (!q)
-                                        {
-                                                if (p == 0)
-                                                {
-                                                        LD_wb_A(z80.bc, 2);
-                                                        /* LD (BC), A */
-                                                }
-                                                else if (p == 1)
-                                                {
-                                                        LD_wb_A(z80.de, 2);
-                                                        /* LD (DE), A */
-                                                }
-                                                else if (p == 2)
-                                                {
-                                                        LDI_HL_A();
-                                                }
-                                                else if (p == 3)
-                                                {
-                                                        LDD_HL_A();
-                                                }
-                                                else
-                                                {
-                                                        printerr(op);
-                                                }
-                                        }
-                                        else
-                                        {
-                                                if (p == 0)
-                                                {
-                                                        LD_A_rb(z80.bc, 2);
-                                                }
-                                                else if (p == 1)
-                                                {
-                                                        LD_A_rb(z80.de, 2);
-                                                }
-                                                else if (p == 2)
-                                                {
-                                                        LDI_A_HL();
-                                                }
-                                                else if (p == 3)
-                                                {
-                                                        LDD_A_HL();
-                                                }
-                                                else
-                                                {
-                                                        printerr(op);
-                                                }
-                                        }
-                                        break;
-                                case 3:
-                                        if (!q)
-                                        {
-                                                INC_nn(table_rp[p]);
-                                        }
-                                        else
-                                        {
-                                                DEC_nn(table_rp[p]);
-                                        }
-                                        break;
-                                case 4:
-                                        if (table_r[y] == NULL)
-                                        {
-                                                INC_HL();
-                                        }
-                                        else
-                                        {
-                                                INC_n(table_r[y]);
-                                        }
-                                        break;
-                                case 5:
-                                        if (table_r[y] == NULL)
-                                        {
-                                                DEC_HL();
-                                        }
-                                        else
-                                        {
-                                                DEC_n(table_r[y]);
-                                        }
-                                        break;
-                                case 6:
-                                        n = rb_cpu(z80.pc);
-                                        z80.pc++;
-                                        if (table_r[y] == NULL)
-                                        {
-                                                LD_HL_n(n);
-                                        }
-                                        else
-                                        {
-                                                LD_nn_n(table_r[y], n);
-                                        }
-                                        break;
-                                case 7:
-                                        switch (y)
-                                        {
-                                        case 0:
-                                                RLCA();
-                                                break;
-                                        case 1:
-                                                RRCA();
-                                                break;
-                                        case 2:
-                                                RLA();
-                                                break;
-                                        case 3:
-                                                RRA();
-                                                break;
-                                        case 4:
-                                                DAA();
-                                                break;
-                                        case 5:
-                                                CPL();
-                                                break;
-                                        case 6:
-                                                SCF();
-                                                break;
-                                        case 7:
-                                                CCF();
-                                                break;
-                                        default:
-                                                printerr(op);
-                                        };
-                                        break;
-                                default:
-                                        printerr(op);
-                                };
-                                break;
-                        case 1:
-                                if (z == 6 && y == 6)
-                                {
-                                        HALT();
-                                }
-                                else
-                                {
-                                        if (table_r[y] == NULL)
-                                        {
-                                                LD_HL_r2(*table_r[z]);
-                                        }
-                                        else if (table_r[z] == NULL)
-                                        {
-                                                LD_r1_r2(table_r[y], rb_cpu(z80.hl), 2);
-                                        }
-                                        else
-                                        {
-                                                LD_r1_r2(table_r[y], *table_r[z], 1);
-                                        }
-                                }
-                                break;
-                        case 2:
-                                if (table_r[z] == NULL)
-                                {
-                                        table_alu[y](rb(z80.hl), 2);
-                                }
-                                else
-                                {
-                                        table_alu[y](*table_r[z], 1);
-                                }
-                                break;
-                        case 3:
-                                switch (z)
-                                {
-                                case 0:
-                                        switch (y)
-                                        {
-                                        case 0:
-                                        case 1:
-                                        case 2:
-                                        case 3:
-                                                RET_cc(table_cc[y]());
-                                                break;
-                                        case 4:
-                                                n = rb_cpu(z80.pc);
-                                                z80.pc++;
-                                                LDH_n_A(n);
-                                                break;
-                                        case 5:
-                                                n = rb_cpu(z80.pc);
-                                                z80.pc++;
-                                                ADD_SP_n((signed char)n);
-                                                break;
-                                        case 6:
-                                                n = rb_cpu(z80.pc);
-                                                z80.pc++;
-                                                LDH_A_n(n);
-                                                break;
-                                        case 7:
-                                                n = rb_cpu(z80.pc);
-                                                z80.pc++;
-                                                LDHL_SP_n((signed char)n);
-                                                break;
-                                        default:
-                                                printerr(op);
-                                        }
-                                        break;
-                                case 1:
-                                        if (!q)
-                                        {
-                                                POP_nn(table_rp2[p]);
-                                        }
-                                        else
-                                        {
-                                                if (p == 0)
-                                                {
-                                                        RET();
-                                                }
-                                                else if (p == 1)
-                                                {
-                                                        RETI();
-                                                }
-                                                else if (p == 2)
-                                                {
-                                                        JP_HL();
-                                                }
-                                                else if (p == 3)
-                                                {
-                                                        LD_SP_HL();
-                                                }
-                                        }
-                                        break;
-                                case 2:
-                                        switch (y)
-                                        {
-                                        case 0:
-                                        case 1:
-                                        case 2:
-                                        case 3:
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                JP_cc_nn(table_cc[y](), nn);
-                                                break;
-                                        case 4:
-                                                LD_C_A();
-                                                break;
-                                        case 5:
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                LD_wb_A(nn, 4);
-                                                break;
-                                        case 6:
-                                                LD_A_C();
-                                                break;
-                                        case 7:
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                LD_A_rb(nn, 4);
-                                                break;
-                                        default:
-                                                printerr(op);
-                                        }
-                                        break;
-                                case 3:
-                                        if (y == 0)
-                                        {
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                JP_nn(nn);
-                                        }
-                                        else if (y == 6)
-                                        {
-                                                DI();
-                                        }
-                                        else if (y == 7)
-                                        {
-                                                EI();
-                                        }
-                                        break;
-                                case 4:
-                                        if (y >= 0 && y <= 3)
-                                        {
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                CALL_cc_nn(table_cc[y](), nn);
-                                        }
-                                        break;
-                                case 5:
-                                        if (q == 0)
-                                        {
-                                                PUSH_nn(table_rp2[p]);
-                                        }
-                                        else if (p == 0)
-                                        {
-                                                nn = rw(z80.pc);
-                                                z80.pc += 2;
-                                                CALL_nn(nn);
-                                        }
-                                        break;
-                                case 6:
-                                        n = rb_cpu(z80.pc);
-                                        z80.pc++;
-                                        table_alu[y](n, 2);
-                                        break;
-                                case 7:
-                                        RST_n(y * 8);
-                                        break;
-                                default:
-                                        printerr(op);
-                                }
-                                break;
-                        default:
-                                printerr(op);
-                        }
-                }
-        }
-        else
-        {
-                z80.m = 1;
-                z80.t = 4;
-        }
-
-        /* do other things i guess */
-
-        // z80.clock.m += z80.m;
-        // z80.clock.t += z80.t;
-        cycles += z80.m;
-        update_clock();
-        gpu_step();
-        // printf("ime: %d", z80.ime);
-
-        z80.m = z80.t = 0;
-
-        unsigned char ints = z80.int_en & z80.int_f & 0x1F;
-
-        if (ints)
-        {
-                z80.halt = false;
-        }
-
-        if (ints && z80.ime)
-        {
-                z80.ime = false;
-                z80.new_ime = false;
-                if (GET_BIT(ints, 0))
-                {
-                        z80.int_f &= ~0x1;
-                        RST40();
-                        // do V-Blank
-                }
-                else if (GET_BIT(ints, 1))
-                {
-                        z80.int_f &= ~0x2;
-                        RST48();
-                        // do LCD STAT
-                }
-                else if (GET_BIT(ints, 2))
-                {
-                        z80.int_f &= ~0x4;
-                        RST50();
-                }
-                else if (GET_BIT(ints, 3))
-                {
-                        z80.int_f &= ~0x8;
-                        RST58();
-                }
-                else if (GET_BIT(ints, 4))
-                {
-                        z80.int_f &= ~0x10;
-                        RST60();
-                        printf("keypad IRQ\n");
-                        // handle keypad interaction
-                }
-                // z80.clock.m += z80.m;
-                // z80.clock.t += z80.t;
-                cycles += z80.m;
-                update_clock();
-                gpu_step();
-        }
-
-        if (z80.new_ime)
-                z80.ime = z80.new_ime;
-
-        z80.clock.long_time += cycles;
-        return cycles;
-}
-
 void clock_m_tick()
 {
         unsigned short old_m = z80.clock.m;
@@ -1130,89 +617,9 @@ void clock_m_tick()
         }
 }
 
-void update_clock()
-{
-        unsigned short old_m = z80.clock.m;
-        unsigned short threshold = 1 << (3 + 2 * (((z80.clock.tac & 3) - 1) & 3));
-
-        if (!(z80.clock.old_tac & 4) && (z80.clock.tac & 4))
-        {
-                z80.clock.old_tac = z80.clock.tac;
-                if ((((z80.clock.m & 0xf) + (z80.t & 0xf)) & 0x10) == 0x10)
-                {
-                        // time till carry in
-                        // use up this much time
-                        z80.t -= 0x10 - (z80.clock.m & 0xF);
-                        z80.clock.m += 0x10 - (z80.clock.m & 0xF);
-                }
-        }
-        if (z80.clock.tac & 4)
-        {
-                while (z80.t-- > 0)
-                {
-                        z80.clock.m++;
-
-                        if ((old_m & threshold) && !(z80.clock.m & threshold))
-                        {
-                                z80.clock.tima++;
-                                if (!z80.clock.tima)
-                                {
-                                        z80.clock.tima = z80.clock.tma;
-                                        z80.int_f |= 4;
-                                }
-                        }
-                        old_m = z80.clock.m;
-                }
-        }
-        else
-        {
-                z80.clock.m += z80.t;
-        }
-        mmu->rtc.m_cycles += z80.m;
-        if ((mmu->rtc.m_cycles >= 32) && (!mmu->rtc.halt_flag))
-        {
-                mmu->rtc.m_cycles -= 32;
-                mmu->rtc.ticks++;
-                if (mmu->rtc.ticks >= 0x8000)
-                {
-                        mmu->rtc.ticks -= 0x8000;
-                        mmu->rtc.seconds = (mmu->rtc.seconds + 1) & 0x3F;
-                        if (mmu->rtc.seconds == 60)
-                        {
-                                mmu->rtc.seconds -= 60;
-                                mmu->rtc.minutes = (mmu->rtc.minutes + 1) & 0x3F;
-                                if (mmu->rtc.minutes == 60)
-                                {
-                                        mmu->rtc.minutes -= 60;
-                                        mmu->rtc.hours = (mmu->rtc.hours + 1) & 0x1F;
-                                        if (mmu->rtc.hours == 24)
-                                        {
-                                                mmu->rtc.hours -= 24;
-                                                mmu->rtc.day_counter = (mmu->rtc.day_counter + 1) & 0x3FF;
-                                                if (mmu->rtc.day_counter == 512)
-                                                {
-                                                        mmu->rtc.day_counter_carry = true;
-                                                        mmu->rtc.day_counter -= 512;
-                                                }
-                                        }
-                                }
-                        }
-                }
-        }
-}
-
 /* Opcode definitions */
 
 /* 8-bit loads */
-void LD_nn_n(unsigned char *r, unsigned char n)
-{
-        PRINT_ASM(n);
-        *r = n;
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LD_nn_n_t(unsigned char *r)
 {
         z = rb_cpu(z80.pc);
@@ -1226,15 +633,6 @@ void LD_nn_n_t(unsigned char *r)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LD_r1_r2(unsigned char *r1, unsigned char r2, unsigned char m_time)
-{
-        PRINT_ASM();
-        *r1 = r2;
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
 }
 
 void LD_r1_r2_t(unsigned char *r1, unsigned char r2)
@@ -1268,15 +666,6 @@ void LD_r1_HL_t(unsigned char *r1)
         z80.t = 8;
 } */
 
-void LD_HL_r2(unsigned char r2)
-{
-        PRINT_ASM();
-        wb_cpu(z80.hl, r2);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LD_HL_r2_t(unsigned char r2)
 {
         PRINT_ASM();
@@ -1288,15 +677,6 @@ void LD_HL_r2_t(unsigned char r2)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LD_HL_n(unsigned char n)
-{
-        PRINT_ASM(n);
-        wb_cpu(z80.hl, n);
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void LD_HL_n_t()
@@ -1324,15 +704,6 @@ void LD_HL_n_t()
         z80.m = m_time;
         z80.t = 4 * m_time;
 }*/
-
-void LD_A_rb(unsigned short nn, unsigned char m_time)
-{
-        PRINT_ASM(nn);
-        z80.a = rb_cpu(nn);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
-}
 
 void LD_A_nn_t()
 {
@@ -1380,15 +751,6 @@ void LD_A_rp_t(unsigned short n)
         z80.t = 4 * m_time;
 }*/
 
-void LD_wb_A(unsigned short n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        wb_cpu(n, z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
-}
-
 void LD_nn_A_t()
 {
         PRINT_ASM(rw(z80.pc));
@@ -1425,15 +787,6 @@ void LD_rp_A_t(unsigned short n)
         gpu_m_tick();
 }
 
-void LD_A_C()
-{
-        PRINT_ASM(0xFF00 + z80.c);
-        z80.a = rb_cpu(0xFF00 + z80.c);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LD_A_C_t()
 {
         PRINT_ASM(0xFF00 + z80.c);
@@ -1448,17 +801,6 @@ void LD_A_C_t()
         gpu_m_tick();
 }
 
-void LD_C_A()
-{
-        PRINT_ASM(0xFF00 + z80.c);
-        wb_cpu(0xFF00 + z80.c, z80.a);
-
-        // assert(z80.a == rb_cpu(0xFF00 + z80.c));
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LD_C_A_t()
 {
         PRINT_ASM(0xFF00 + z80.c);
@@ -1470,16 +812,6 @@ void LD_C_A_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LDD_A_HL()
-{
-        PRINT_ASM();
-        z80.a = rb_cpu(z80.hl);
-        z80.hl--;
-
-        z80.m = 2;
-        z80.t = 8;
 }
 
 void LDD_A_HL_t()
@@ -1497,16 +829,6 @@ void LDD_A_HL_t()
         gpu_m_tick();
 }
 
-void LDD_HL_A()
-{
-        PRINT_ASM();
-        wb_cpu(z80.hl, z80.a);
-        z80.hl--;
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LDD_HL_A_t()
 {
         PRINT_ASM();
@@ -1519,16 +841,6 @@ void LDD_HL_A_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LDI_A_HL()
-{
-        PRINT_ASM();
-        z80.a = rb_cpu(z80.hl);
-        z80.hl++;
-
-        z80.m = 2;
-        z80.t = 8;
 }
 
 void LDI_A_HL_t()
@@ -1546,16 +858,6 @@ void LDI_A_HL_t()
         gpu_m_tick();
 }
 
-void LDI_HL_A()
-{
-        PRINT_ASM();
-        wb_cpu(z80.hl, z80.a);
-        z80.hl++;
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LDI_HL_A_t()
 {
         PRINT_ASM();
@@ -1568,17 +870,6 @@ void LDI_HL_A_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LDH_n_A(unsigned char n)
-{
-        PRINT_ASM(n);
-
-        // assert(z80.a == rb_cpu(0xFF00 + n));
-
-        z80.m = 3;
-        z80.t = 12;
-        wb_cpu(0xFF00 + n, z80.a);
 }
 
 void LDH_n_A_t()
@@ -1598,14 +889,6 @@ void LDH_n_A_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LDH_A_n(unsigned char n)
-{
-        z80.a = rb_cpu(0xFF00 + n);
-        PRINT_ASM(n, z80.a);
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void LDH_A_n_t()
@@ -1628,13 +911,6 @@ void LDH_A_n_t()
 }
 
 /* 16-bit loads */
-void LD_n_nn(unsigned short *n, unsigned short nn)
-{
-        PRINT_ASM(nn);
-        *n = nn;
-        z80.m = 3;
-        z80.t = 12;
-}
 
 void LD_n_nn_t(unsigned short *n)
 {
@@ -1656,14 +932,6 @@ void LD_n_nn_t(unsigned short *n)
         gpu_m_tick();
 }
 
-void LD_SP_HL()
-{
-        PRINT_ASM();
-        z80.sp = z80.hl;
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void LD_SP_HL_t()
 {
         PRINT_ASM();
@@ -1675,24 +943,6 @@ void LD_SP_HL_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LDHL_SP_n(signed char n)
-{
-        PRINT_ASM(n);
-        int tmp = z80.sp;
-        tmp += (int)n;
-
-        z80.hl = (unsigned short)tmp;
-
-        BIT_CLEAR(z80.f, ZERO);
-        BIT_CLEAR(z80.f, SUBTRACT);
-
-        SET_HC_ADD(z80.sp, n);
-        SET_C_ADD(z80.sp, n);
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void LDHL_SP_n_t()
@@ -1717,14 +967,6 @@ void LDHL_SP_n_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void LD_nn_SP(unsigned short nn)
-{
-        PRINT_ASM(nn);
-        ww(nn, z80.sp);
-        z80.m = 5;
-        z80.t = 20;
 }
 
 void LD_nn_SP_t()
@@ -1756,15 +998,6 @@ void LD_nn_SP_t()
         gpu_m_tick();
 }
 
-void PUSH_nn(const unsigned short *nn)
-{
-        PRINT_ASM();
-        wb_cpu(--z80.sp, (*nn >> 8) & 0xFF);
-        wb_cpu(--z80.sp, *nn & 0xFF);
-        z80.m = 4;
-        z80.t = 16;
-}
-
 void PUSH_nn_t(const unsigned short *nn)
 {
         PRINT_ASM();
@@ -1785,20 +1018,6 @@ void PUSH_nn_t(const unsigned short *nn)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void POP_nn(unsigned short *nn)
-{
-        PRINT_ASM();
-
-        *nn = rw(z80.sp);
-        if (nn == &z80.af)
-                *nn &= (0xFFF0);
-
-        z80.sp += 2;
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void POP_nn_t(unsigned short *nn)
@@ -1824,20 +1043,6 @@ void POP_nn_t(unsigned short *nn)
 }
 
 /* 8-bit ALU */
-void ADD_A_n(unsigned char n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        SET_HC_ADD(z80.a, n);
-        SET_C_ADD(z80.a, n);
-
-        z80.a += n;
-        SET_Z_RES(z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
-}
-
 void ADD_A_n_t()
 {
         z = rb_cpu(z80.pc);
@@ -1893,22 +1098,6 @@ void ADD_A_r_t(unsigned char n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void ADC_A_n(unsigned char n, unsigned char m_time)
-{
-        unsigned char carry = GET_BIT(z80.f, CARRY);
-        PRINT_ASM(n);
-        SET_HC_ADC(z80.a, n, carry);
-        SET_C_ADC(z80.a, n, carry);
-
-        z80.a = 0xFF & (z80.a + n + carry);
-        BIT_CLEAR(z80.f, SUBTRACT);
-
-        SET_Z_RES(z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
 }
 
 void ADC_A_n_t()
@@ -1975,21 +1164,6 @@ void ADC_A_r_t(unsigned char n)
         gpu_m_tick();
 }
 
-void SUB_A_n(unsigned char n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        BIT_SET(z80.f, SUBTRACT);
-        SET_HC_SUB(z80.a, n);
-        SET_C_SUB(z80.a, n);
-
-        z80.a -= n;
-
-        SET_Z_RES(z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
-}
-
 void SUB_A_n_t()
 {
         z = rb_cpu(z80.pc);
@@ -2049,22 +1223,6 @@ void SUB_A_r_t(unsigned char n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void SBC_A_n(unsigned char n, unsigned char m_time)
-{
-        unsigned char carry = GET_BIT(z80.f, CARRY);
-        PRINT_ASM(n);
-
-        BIT_SET(z80.f, SUBTRACT);
-        SET_HC_SBC(z80.a, n, carry);
-        SET_C_SBC(z80.a, n, carry);
-
-        z80.a = 0xFF & (z80.a - n - carry);
-        SET_Z_RES(z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
 }
 
 void SBC_A_n_t()
@@ -2128,21 +1286,6 @@ void SBC_A_r_t(unsigned char n)
         gpu_m_tick();
 }
 
-void AND_n(unsigned char n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        z80.a &= n;
-
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, CARRY);
-
-        SET_Z_RES(z80.a);
-        BIT_SET(z80.f, HALF_CARRY);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
-}
-
 void AND_n_t()
 {
         z = rb_cpu(z80.pc);
@@ -2204,18 +1347,6 @@ void AND_r_t(unsigned char n)
         gpu_m_tick();
 }
 
-void OR_n(unsigned char n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        z80.a |= n;
-
-        z80.f &= ~0x7F;
-        SET_Z_RES(z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
-}
-
 void OR_n_t()
 {
         z = rb_cpu(z80.pc);
@@ -2263,20 +1394,6 @@ void OR_r_t(unsigned char n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void XOR_n(unsigned char n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        z80.a ^= n;
-        BIT_CLEAR(z80.f, CARRY);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-        BIT_CLEAR(z80.f, SUBTRACT);
-
-        SET_Z_RES(z80.a);
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
 }
 
 void XOR_n_t()
@@ -2335,21 +1452,6 @@ void XOR_r_t(unsigned char n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void CP_n(unsigned char n, unsigned char m_time)
-{
-        PRINT_ASM(n);
-        SET_C_SUB(z80.a, n);
-        SET_HC_SUB(z80.a, n);
-        BIT_SET(z80.f, SUBTRACT);
-
-        z80.a -= n;
-        SET_Z_RES(z80.a);
-        z80.a += n;
-
-        z80.m = m_time;
-        z80.t = 4 * m_time;
 }
 
 void CP_n_t()
@@ -2413,20 +1515,6 @@ void CP_r_t(unsigned char n)
         gpu_m_tick();
 }
 
-void INC_n(unsigned char *n)
-{
-        PRINT_ASM(*n);
-
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_EQUAL(z80.f, HALF_CARRY, ((*n) & 0xF) == (0xF));
-        // SET_HC_ADD(*n, 1);
-        (*n)++;
-        SET_Z_RES(*n);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void INC_n_t(unsigned char *n)
 {
         PRINT_ASM(*n);
@@ -2441,23 +1529,6 @@ void INC_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void INC_HL()
-{
-        unsigned char tmp = rb_cpu(z80.hl);
-        PRINT_ASM(tmp);
-
-        SET_HC_ADD(tmp, 1);
-        tmp += 1;
-
-        wb_cpu(z80.hl, tmp);
-
-        BIT_CLEAR(z80.f, SUBTRACT);
-        SET_Z_RES(tmp);
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void INC_HL_t()
@@ -2481,19 +1552,6 @@ void INC_HL_t()
         gpu_m_tick();
 }
 
-void DEC_n(unsigned char *n)
-{
-        PRINT_ASM(*n);
-        BIT_SET(z80.f, SUBTRACT);
-        BIT_EQUAL(z80.f, HALF_CARRY, ((*n) & 0xF) == 0);
-        // SET_HC_SUB(*n, 1);
-        (*n)--;
-        SET_Z_RES(*n);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void DEC_n_t(unsigned char *n)
 {
         PRINT_ASM(*n);
@@ -2507,22 +1565,6 @@ void DEC_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void DEC_HL()
-{
-        unsigned char tmp = rb_cpu(z80.hl);
-        PRINT_ASM(tmp);
-
-        SET_HC_SUB(tmp, 1);
-        tmp -= 1;
-        wb_cpu(z80.hl, tmp);
-
-        BIT_SET(z80.f, SUBTRACT);
-        SET_Z_RES(tmp);
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void DEC_HL_t()
@@ -2547,19 +1589,6 @@ void DEC_HL_t()
 }
 
 /* 16-bit ALU */
-void ADD_HL_n(const unsigned short *n)
-{
-        PRINT_ASM();
-        BIT_CLEAR(z80.f, SUBTRACT);
-        SET_HC_ADD_16(z80.hl, *n);
-        SET_C_ADD_16(z80.hl, *n);
-
-        z80.hl += *n;
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void ADD_HL_n_t(const unsigned short *n)
 {
         PRINT_ASM();
@@ -2584,20 +1613,6 @@ void ADD_HL_n_t(const unsigned short *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void ADD_SP_n(signed char n)
-{
-        PRINT_ASM(n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, ZERO);
-        SET_HC_ADD(z80.sp, n);
-        SET_C_ADD(z80.sp, n);
-
-        z80.sp += n;
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void ADD_SP_n_t()
@@ -2627,15 +1642,6 @@ void ADD_SP_n_t()
         gpu_m_tick();
 }
 
-void INC_nn(unsigned short *nn)
-{
-        PRINT_ASM();
-        (*nn)++;
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void INC_nn_t(unsigned short *nn)
 {
         PRINT_ASM();
@@ -2647,15 +1653,6 @@ void INC_nn_t(unsigned short *nn)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void DEC_nn(unsigned short *nn)
-{
-        PRINT_ASM();
-        (*nn)--;
-
-        z80.m = 2;
-        z80.t = 8;
 }
 
 void DEC_nn_t(unsigned short *nn)
@@ -2672,24 +1669,6 @@ void DEC_nn_t(unsigned short *nn)
 }
 
 /* Misc */
-void SWAP_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        unsigned char tmp = 0;
-        tmp |= ((*n) >> 4) & 0x0F;
-        tmp |= ((*n) << 4) & 0xF0;
-
-        *n = tmp;
-
-        BIT_CLEAR(z80.f, CARRY);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        SET_Z_RES(tmp);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void SWAP_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -2708,26 +1687,6 @@ void SWAP_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void SWAP_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char tmp = 0, val;
-        val = rb_cpu(z80.hl);
-
-        tmp |= (val >> 4) & 0x0F;
-        tmp |= (val << 4) & 0xF0;
-
-        wb_cpu(z80.hl, tmp);
-
-        BIT_CLEAR(z80.f, CARRY);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        SET_Z_RES(tmp);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void SWAP_HL_t()
@@ -2752,40 +1711,6 @@ void SWAP_HL_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void DAA()
-{
-        PRINT_ASM();
-        if (!GET_BIT(z80.f, SUBTRACT))
-        {
-                if (GET_BIT(z80.f, CARRY) || z80.a > 0x99)
-                {
-                        z80.a += 0x60;
-                        BIT_SET(z80.f, CARRY);
-                }
-                if (GET_BIT(z80.f, HALF_CARRY) || (z80.a & 0x0F) > 0x09)
-                {
-                        z80.a += 0x06;
-                }
-        }
-        else
-        {
-                if (GET_BIT(z80.f, CARRY))
-                {
-                        z80.a -= 0x60;
-                }
-                if (GET_BIT(z80.f, HALF_CARRY))
-                {
-                        z80.a -= 0x06;
-                }
-        }
-
-        SET_Z_RES(z80.a);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
 }
 
 void DAA_t()
@@ -2824,17 +1749,6 @@ void DAA_t()
         gpu_m_tick();
 }
 
-void CPL()
-{
-        PRINT_ASM();
-        z80.a = ~z80.a;
-        BIT_SET(z80.f, SUBTRACT);
-        BIT_SET(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void CPL_t()
 {
         PRINT_ASM();
@@ -2846,17 +1760,6 @@ void CPL_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void CCF()
-{
-        PRINT_ASM();
-        BIT_FLIP(z80.f, CARRY);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
 }
 
 void CCF_t()
@@ -2872,17 +1775,6 @@ void CCF_t()
         gpu_m_tick();
 }
 
-void SCF()
-{
-        PRINT_ASM();
-        BIT_SET(z80.f, CARRY);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void SCF_t()
 {
         PRINT_ASM();
@@ -2896,13 +1788,6 @@ void SCF_t()
         gpu_m_tick();
 }
 
-void NOP()
-{
-        PRINT_ASM();
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void NOP_t()
 {
         PRINT_ASM();
@@ -2910,15 +1795,6 @@ void NOP_t()
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
-}
-
-void HALT()
-{
-        PRINT_ASM();
-        z80.halt = true;
-
-        z80.m = 1;
-        z80.t = 4;
 }
 
 void HALT_t()
@@ -2931,15 +1807,6 @@ void HALT_t()
         clock_m_tick();
 }
 
-void STOP()
-{
-        PRINT_ASM();
-        z80.stop = true;
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void STOP_t()
 {
         PRINT_ASM();
@@ -2948,16 +1815,6 @@ void STOP_t()
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
-}
-
-void DI()
-{
-        PRINT_ASM();
-        z80.ime = false;
-        z80.new_ime = false;
-
-        z80.m = 1;
-        z80.t = 4;
 }
 
 void DI_t()
@@ -2972,17 +1829,6 @@ void DI_t()
         clock_m_tick();
 }
 
-void EI()
-{
-        PRINT_ASM();
-        z80.new_ime = true;
-        // z80.ime = true;
-        // printf("ime: %d", z80.ime);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void EI_t()
 {
         PRINT_ASM();
@@ -2995,20 +1841,6 @@ void EI_t()
 }
 
 /* Rotates & Shifts */
-void RLCA()
-{
-        PRINT_ASM();
-        z80.a = (unsigned char)((z80.a << 1) | (z80.a >> 7));
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 0));
-
-        BIT_CLEAR(z80.f, ZERO);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void RLCA_t()
 {
         PRINT_ASM();
@@ -3022,21 +1854,6 @@ void RLCA_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RLA()
-{
-        PRINT_ASM();
-        unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 7));
-        z80.a = (0xFF & (z80.a << 1)) | old_carry;
-
-        BIT_CLEAR(z80.f, ZERO);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
 }
 
 void RLA_t()
@@ -3056,20 +1873,6 @@ void RLA_t()
         gpu_m_tick();
 }
 
-void RRCA()
-{
-        PRINT_ASM();
-        z80.a = (unsigned char)((z80.a >> 1) | (z80.a << 7));
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 7));
-
-        BIT_CLEAR(z80.f, ZERO);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void RRCA_t()
 {
         PRINT_ASM();
@@ -3084,21 +1887,6 @@ void RRCA_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RRA()
-{
-        PRINT_ASM();
-        unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(z80.a, 0));
-        z80.a = (unsigned char)((z80.a >> 1) | (old_carry << 7));
-
-        BIT_CLEAR(z80.f, ZERO);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 1;
-        z80.t = 4;
 }
 
 void RRA_t()
@@ -3118,20 +1906,6 @@ void RRA_t()
         gpu_m_tick();
 }
 
-void RLC_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        *n = (unsigned char)((*n << 1) | (*n >> 7));
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 0));
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void RLC_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -3146,23 +1920,6 @@ void RLC_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RLC_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char val = rb_cpu(z80.hl);
-        val = (unsigned char)((val << 1) | (val >> 7));
-        wb_cpu(z80.hl, val);
-
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 0));
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void RLC_HL_t()
@@ -3187,21 +1944,6 @@ void RLC_HL_t()
         gpu_m_tick();
 }
 
-void RL_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 7));
-        *n = (unsigned char)((0xFF & (*n << 1)) | old_carry);
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void RL_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -3217,24 +1959,6 @@ void RL_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RL_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        unsigned char val = rb_cpu(z80.hl);
-
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
-        val = (unsigned char)((0xFF & (val << 1)) | old_carry);
-        wb_cpu(z80.hl, val);
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void RL_HL_t()
@@ -3258,19 +1982,6 @@ void RL_HL_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-void RRC_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        *n = (unsigned char)((*n >> 1) | (*n << 7));
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 7));
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
 }
 
 void RRC_n_t(unsigned char *n)
@@ -3311,38 +2022,6 @@ void RRC_HL_t()
         gpu_m_tick();
 }
 
-void RRC_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char val = rb_cpu(z80.hl);
-
-        val = (unsigned char)((val >> 1) | (val << 7));
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
-        wb_cpu(z80.hl, val);
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
-}
-
-void RR_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        BIT_EQUAL(z80.f, CARRY, (*n) & 1);
-        *n = (unsigned char)((*n >> 1) | (old_carry << 7));
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void RR_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -3358,23 +2037,6 @@ void RR_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RR_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char old_carry = GET_BIT(z80.f, CARRY);
-        unsigned char val = rb_cpu(z80.hl);
-        BIT_EQUAL(z80.f, CARRY, val & 1);
-        val = (unsigned char)((val >> 1) | (old_carry << 7));
-        wb_cpu(z80.hl, val);
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void RR_HL_t()
@@ -3400,20 +2062,6 @@ void RR_HL_t()
         gpu_m_tick();
 }
 
-void SLA_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 7));
-        *n = (unsigned char)(*n << 1);
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void SLA_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -3428,23 +2076,6 @@ void SLA_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void SLA_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char val = rb_cpu(z80.hl);
-
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 7));
-        val = (unsigned char)(val << 1);
-        wb_cpu(z80.hl, val);
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void SLA_HL_t()
@@ -3469,20 +2100,6 @@ void SLA_HL_t()
         gpu_m_tick();
 }
 
-void SRA_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(*n, 0));
-        *n = (unsigned char)(((signed char)*n) >> 1);
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void SRA_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -3497,22 +2114,6 @@ void SRA_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void SRA_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char val = rb_cpu(z80.hl);
-        BIT_EQUAL(z80.f, CARRY, GET_BIT(val, 0));
-        val = (unsigned char)(((signed char)val) >> 1);
-        wb_cpu(z80.hl, val);
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void SRA_HL_t()
@@ -3537,22 +2138,6 @@ void SRA_HL_t()
         gpu_m_tick();
 }
 
-void SRL_n(unsigned char *n)
-{
-        PRINT_ASM_CB();
-        BIT_EQUAL(z80.f, CARRY, (*n) & 0x1);
-        *n = (unsigned char)((*n) >> 1);
-
-        assert(GET_BIT(*n, 7) == 0);
-
-        SET_Z_RES(*n);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void SRL_n_t(unsigned char *n)
 {
         PRINT_ASM_CB();
@@ -3569,24 +2154,6 @@ void SRL_n_t(unsigned char *n)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void SRL_HL()
-{
-        PRINT_ASM_CB();
-        unsigned char val = rb_cpu(z80.hl);
-        BIT_EQUAL(z80.f, CARRY, val & 0x1);
-        val = (unsigned char)(val >> 1);
-
-        assert(GET_BIT(val, 7) == 0);
-        wb_cpu(z80.hl, val);
-
-        SET_Z_RES(val);
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_CLEAR(z80.f, HALF_CARRY);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void SRL_HL_t()
@@ -3613,17 +2180,6 @@ void SRL_HL_t()
 }
 
 /* Bit Opcodes */
-void BIT_b_r(unsigned char b, unsigned char r)
-{
-        PRINT_ASM_CB(b);
-        BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_SET(z80.f, HALF_CARRY);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void BIT_b_r_t(unsigned char b, unsigned char r)
 {
         PRINT_ASM_CB(b);
@@ -3635,18 +2191,6 @@ void BIT_b_r_t(unsigned char b, unsigned char r)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void BIT_b_HL(unsigned char b)
-{
-        PRINT_ASM_CB(b);
-        unsigned char r = rb_cpu(z80.hl);
-        BIT_EQUAL(z80.f, ZERO, !BIT_CHECK(r, b));
-        BIT_CLEAR(z80.f, SUBTRACT);
-        BIT_SET(z80.f, HALF_CARRY);
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void BIT_b_HL_t(unsigned char b)
@@ -3665,15 +2209,6 @@ void BIT_b_HL_t(unsigned char b)
         gpu_m_tick();
 }
 
-void SET_b_r(unsigned char b, unsigned char *r)
-{
-        PRINT_ASM_CB(b);
-        BIT_SET(*r, b);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void SET_b_r_t(unsigned char b, unsigned char *r)
 {
         PRINT_ASM_CB(b);
@@ -3683,17 +2218,6 @@ void SET_b_r_t(unsigned char b, unsigned char *r)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void SET_b_HL(unsigned char b)
-{
-        PRINT_ASM_CB(b);
-        unsigned char r = rb_cpu(z80.hl);
-        BIT_SET(r, b);
-        wb_cpu(z80.hl, r);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void SET_b_HL_t(unsigned char b)
@@ -3714,15 +2238,6 @@ void SET_b_HL_t(unsigned char b)
         gpu_m_tick();
 }
 
-void RES_b_r(unsigned char b, unsigned char *r)
-{
-        PRINT_ASM_CB(b);
-        BIT_CLEAR(*r, b);
-
-        z80.m = 2;
-        z80.t = 8;
-}
-
 void RES_b_r_t(unsigned char b, unsigned char *r)
 {
         PRINT_ASM_CB(b);
@@ -3732,17 +2247,6 @@ void RES_b_r_t(unsigned char b, unsigned char *r)
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RES_b_HL(unsigned char b)
-{
-        PRINT_ASM_CB(b);
-        unsigned char r = rb_cpu(z80.hl);
-        BIT_CLEAR(r, b);
-        wb_cpu(z80.hl, r);
-
-        z80.m = 4;
-        z80.t = 16;
 }
 
 void RES_b_HL_t(unsigned char b)
@@ -3764,16 +2268,6 @@ void RES_b_HL_t(unsigned char b)
 }
 
 /* Jumps */
-void JP_nn(unsigned short nn)
-{
-        PRINT_ASM(nn);
-        z80.pc = nn;
-
-        z80.m = 4;
-        z80.t = 16;
-        /* maybe takes another m-cycle to jump. same for JP_cc_nn */
-}
-
 void JP_nn_t()
 {
         PRINT_ASM(rw(z80.pc));
@@ -3795,20 +2289,6 @@ void JP_nn_t()
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
-}
-
-void JP_cc_nn(bool cc, unsigned short nn)
-{
-        PRINT_ASM(nn);
-
-        z80.m = 3;
-        z80.t = 12;
-        if (cc)
-        {
-                z80.pc = nn;
-                z80.m += 1;
-                z80.t += 4;
-        }
 }
 
 void JP_cc_nn_t(bool cc)
@@ -3844,15 +2324,6 @@ void JP_cc_nn_t(bool cc)
         }
 }
 
-void JP_HL()
-{
-        PRINT_ASM();
-        z80.pc = z80.hl;
-
-        z80.m = 1;
-        z80.t = 4;
-}
-
 void JP_HL_t()
 {
         PRINT_ASM();
@@ -3860,15 +2331,6 @@ void JP_HL_t()
         z80.pc = z80.hl + 1;
         gpu_m_tick();
         clock_m_tick();
-}
-
-void JR_n(signed char n)
-{
-        PRINT_ASM(n);
-        z80.pc += n;
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void JR_n_t()
@@ -3888,20 +2350,6 @@ void JR_n_t()
         z80.pc = wz + 1;
         gpu_m_tick();
         clock_m_tick();
-}
-
-void JR_cc_n(bool cc, signed char n)
-{
-        PRINT_ASM(n);
-
-        z80.m = 2;
-        z80.t = 8;
-        if (cc)
-        {
-                z80.pc += n;
-                z80.m += 1;
-                z80.t += 4;
-        }
 }
 
 void JR_cc_n_t(bool cc)
@@ -3933,18 +2381,6 @@ void JR_cc_n_t(bool cc)
 }
 
 /* Calls */
-void CALL_nn(unsigned short nn)
-{
-        PRINT_ASM(nn);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-        // printf("(%04x) = %04x\n", z80.sp, z80.pc);
-        z80.pc = nn;
-
-        z80.m = 6;
-        z80.t = 24;
-}
-
 void CALL_nn_t()
 {
         PRINT_ASM(rw(z80.pc));
@@ -3976,24 +2412,6 @@ void CALL_nn_t()
         z80.pc++;
         gpu_m_tick();
         clock_m_tick();
-}
-
-void CALL_cc_nn(bool cc, unsigned short nn)
-{
-        PRINT_ASM(nn);
-        if (cc)
-        {
-                z80.sp -= 2;
-                ww(z80.sp, z80.pc);
-                z80.pc = nn;
-
-                z80.m = 6;
-                z80.t = 24;
-                return;
-        }
-
-        z80.m = 3;
-        z80.t = 12;
 }
 
 void CALL_cc_nn_t(bool cc)
@@ -4033,17 +2451,6 @@ void CALL_cc_nn_t(bool cc)
 }
 
 /* Restarts */
-void RST_n(unsigned char n)
-{
-        PRINT_ASM(n);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-        z80.pc = n;
-
-        z80.m = 4;
-        z80.t = 16;
-}
-
 void RST_n_t(unsigned char n)
 {
         PRINT_ASM(n);
@@ -4067,17 +2474,6 @@ void RST_n_t(unsigned char n)
         clock_m_tick();
 }
 
-void RST40()
-{
-        // printf("0x%04x RST 40\n", z80.pc);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-
-        z80.pc = 0x40;
-        z80.m = 4;
-        z80.t = 16;
-}
-
 void RST_IRQ_n_t(unsigned char irq)
 {
 #ifdef DEBUG
@@ -4094,62 +2490,7 @@ void RST_IRQ_n_t(unsigned char irq)
         clock_m_tick();
 }
 
-void RST48()
-{
-        // printf("0x%04x RST 48\n", z80.pc);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-
-        z80.pc = 0x48;
-        z80.m = 4;
-        z80.t = 16;
-}
-
-void RST50()
-{
-        // printf("0x%04x RST 50\n", z80.pc);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-
-        z80.pc = 0x50;
-        z80.m = 4;
-        z80.t = 16;
-}
-
-void RST58()
-{
-        // printf("0x%04x RST 58\n", z80.pc);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-
-        z80.pc = 0x58;
-        z80.m = 4;
-        z80.t = 16;
-}
-
-void RST60()
-{
-        // printf("0x%04x RST 60\n", z80.pc);
-        z80.sp -= 2;
-        ww(z80.sp, z80.pc);
-
-        z80.pc = 0x60;
-        z80.m = 4;
-        z80.t = 16;
-}
-
 /* Returns */
-void RET()
-{
-        PRINT_ASM();
-        z80.pc = rw(z80.sp);
-        // printf("%04x = (%04x)\n", z80.pc, z80.pc);
-        z80.sp += 2;
-
-        z80.m = 4;
-        z80.t = 16;
-}
-
 void RET_t()
 {
         PRINT_ASM();
@@ -4171,24 +2512,6 @@ void RET_t()
         z80.pc++;
         clock_m_tick();
         gpu_m_tick();
-}
-
-void RET_cc(bool cc)
-{
-        PRINT_ASM();
-        if (cc)
-        {
-                z80.pc = rw(z80.sp);
-                // printf("%04x = (%04x)\n", z80.pc, z80.sp);
-                z80.sp += 2;
-
-                z80.m = 5;
-                z80.t = 20;
-                return;
-        }
-
-        z80.m = 2;
-        z80.t = 8;
 }
 
 void RET_cc_t(bool cc)
@@ -4218,17 +2541,6 @@ void RET_cc_t(bool cc)
         gpu_m_tick();
 }
 
-void RETI()
-{
-        PRINT_ASM();
-        z80.pc = rw(z80.sp);
-        z80.sp += 2;
-        z80.ime = true;
-
-        z80.m = 4;
-        z80.t = 16;
-}
-
 void RETI_t()
 {
         PRINT_ASM();
@@ -4256,9 +2568,6 @@ void RETI_t()
 static bool (*table_cc[])(void) = {
     cc_nz, cc_z, cc_nc, cc_c};
 
-static void (*table_alu[])(unsigned char, unsigned char) = {
-    ADD_A_n, ADC_A_n, SUB_A_n, SBC_A_n, AND_n, XOR_n, OR_n, CP_n};
-
 static void (*table_alu_r_t[])(unsigned char) = {
     ADD_A_r_t, ADC_A_r_t, SUB_A_r_t, SBC_A_r_t, AND_r_t, XOR_r_t, OR_r_t, CP_r_t};
 
@@ -4267,11 +2576,6 @@ static void (*table_alu_n_t[])(void) = {
 
 static void (*table_alu_hl_t[])(void) = {
     ADD_A_HL_t, ADC_A_HL_t, SUB_A_HL_t, SBC_A_HL_t, AND_HL_t, XOR_HL_t, OR_HL_t, CP_HL_t};
-
-static void (*table_rot[])(unsigned char *) = {
-    RLC_n, RRC_n, RL_n, RR_n, SLA_n, SRA_n, SWAP_n, SRL_n};
-static void (*table_rot_HL[])(void) = {
-    RLC_HL, RRC_HL, RL_HL, RR_HL, SLA_HL, SRA_HL, SWAP_HL, SRL_HL};
 
 static void (*table_rot_t[])(unsigned char *) = {
     RLC_n_t, RRC_n_t, RL_n_t, RR_n_t, SLA_n_t, SRA_n_t, SWAP_n_t, SRL_n_t};

@@ -44,10 +44,6 @@ void audio_callback(void *userdata, unsigned char *stream, int len)
         do
         {
                 cpu_tick();
-                // cycles = fetch_dispatch_execute();
-                // quit = cycles ? false : true;
-                // i += cycles;
-                // } while (i < 17556 && !quit);
         } while (z80.clock.long_time < 22369 + extra_cycle && !quit);
         if (quit)
         {
@@ -254,43 +250,6 @@ int main(int argc, char *argv[])
                 if (runframe)
                 {
                         nanosleep(&(struct timespec){.tv_nsec = 16742706}, NULL);
-                        // struct timespec lastTime, currentTime;
-
-                        // lastTime = SDL_GetTicks();
-                        // clock_gettime(CLOCK_MONOTONIC, &lastTime);
-
-                        // runframe = !frame();
-
-                        // currentTime = SDL_GetTicks();
-                        // long n_samples = Multi_Buffer_samples_avail(buf);
-                        // short audioData[n_samples];
-                        // Multi_Buffer_read_samples(buf, &audioData, n_samples);
-                        // SDL_QueueAudio(dev, audioData, n_samples * 2);
-
-                        //         // nanosleep(&(struct timespec){.tv_nsec = 2000}, NULL);
-
-                        // clock_gettime(CLOCK_MONOTONIC, &currentTime);
-                        // long diffTime = (currentTime.tv_sec - lastTime.tv_sec) * 1000000000 + (currentTime.tv_nsec - lastTime.tv_nsec);
-
-                        // char window_title[100] = "gbc_cpp";
-                        // printf("%.2f FPS\n", 1e9 / diffTime);
-                        // window_title = "gbc_cpp";
-                        // SDL_SetWindowTitle(window, window_title);
-                        // clock_gettime(CLOCK_MONOTONIC, &currentTime);
-                        // diffTime = (currentTime.tv_sec - lastTime.tv_sec) * 1000000000 + (currentTime.tv_nsec - lastTime.tv_nsec);
-                        // diffTime = (16742706 - diffTime);
-                        // lastTime = (0 < (int)(17 + lastTime - currentTime)) ? (17 +
-                        // lastTime - currentTime) : 0; printf("%ld\n", diffTime);
-                        // SDL_Delay(lastTime);
-
-                        // calculate framrate
-                        // diffTime = (16000000 - diffTime);
-                        // diffTime = (16740000 - diffTime);
-                        // nanosleep(&(struct timespec){.tv_nsec = diffTime}, NULL);
-                        // spin while
-                        // while (SDL_GetQueuedAudioSize(dev) > 1)
-                        // {
-                        // }
                 }
                 else
                 {
@@ -302,28 +261,6 @@ int main(int argc, char *argv[])
         cleanup();
 
         return 0;
-}
-
-bool frame()
-{
-        int i = 0;
-        int cycles = 0;
-        bool quit = false;
-        bool stereo;
-        size_t count;
-
-        do
-        {
-                cycles = fetch_dispatch_execute();
-                quit = cycles ? false : true;
-                i += cycles;
-        } while (i < 17556 && !quit);
-        z80.clock.long_time = 0;
-
-        stereo = Gb_Apu_end_frame(apu, 70224);
-        Multi_Buffer_end_frame(buf, 70224, stereo);
-
-        return quit;
 }
 
 void INThandler(int sig)
