@@ -67,6 +67,7 @@ typedef struct
                 unsigned short m;
         };                                     // 2 bytes
         unsigned char tima, tma, tac, old_tac; // 4 bytes
+        bool tima_reloaded;                    // 4 bytes
         long long_time;                        // 8 bytes?
 } clock_type;                                  // 14 bytes, aligned to 8
 

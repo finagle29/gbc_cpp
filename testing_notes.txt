@@ -16,7 +16,7 @@ div_write.gb
 rapid_toggle.gb
 	passed
 tim00.gb
-	pass
+	passed
 tim00_div_trigger.gb
 	passed
 tim01.gb
@@ -32,25 +32,11 @@ tim11.gb
 tim11_div_trigger.gb
 	passed
 tima_reload.gb
-	assertions
-		B: OK
-		C: OK
-		D: OK
-		E: 00! (FE)
-		H: OK
-		L: 00! (FE)
+	passed
 tima_write_reloading.gb
-	assertions
-		C: FE! (7F)
-		D: OK
-		E: OK
-		L: OK
+	passed
 tma_write_reloading.gb
-	assertions:
-		C: OK
-		D: 7F! (FE)
-		E: 7F! (FE)
-		L: OK
+	passed
 
 mooneye-gb_hwtests/acceptance/oam_dma
 basic.gb
@@ -76,7 +62,6 @@ mooneye-gb_hwtests/acceptance/interrupts
 ie_push.gb
 	passed
 
-
 mooneye-bg_hwtests/emulator_only/mbc1
 all tests pass
 
@@ -90,27 +75,17 @@ mooneye-gb_hwtests/acceptance/ppu
 hblank_ly_scx_timing-GS.gb
 	test failed
 intr_1_2_timing-GS.gb
-	assertions:
-		D: 14! (00)
-		E: 15! (00)
+	passed
 intr_2_0_timing.gb
-	assertions:
-		D: 07! (08)
-		E: OK
+	passed
 intr_2_mode0_timing.gb
-	assertions:
-		D: 01! (02)
-		E: OK
+	passed
 intr_2_mode0_timing_sprites.gb
 	test #00 failed
 intr_2_mode3_timing.gb
-	assertions:
-		D: 01! (02)
-		E: OK
+	passed
 intr_2_oam_ok_timing.gb
-	assertions:
-		D: 01! (02)
-		E: OK
+	passed
 lcdon_timing-GS.gb
 	test failed: LY
 	cycle: $00
@@ -122,15 +97,11 @@ lcdon_write_timing-GS.gb
 	expected: $00
 	actual: $81
 stat_irq_blocking.gb
-	failed
+	passed
 stat_lyc_onoff.gb
-	fail: r1 step 1
+	passed
 vblank_stat_intr-GS.gb
-	assertions:
-		B: 01! (11)
-		C: 00! (11)
-		D: 01! (00)
-		E: OK
+	passed
 
 mooneye-gb_hwtests/acceptance/serial
 boot_sclk_align-dmgABCmgb.gb
@@ -140,17 +111,9 @@ mooneye-gb_hwtests/acceptance
 add_sp_e_timing.gb
 	passed
 boot_div-dmgABCmgb.gb
-	assertions:
-		B: AC! (AB)
-		C: AD! (AC)
-		D: OK
-		E: OK
-		H: OK
-		L: B1! (B0)
+	passed
 boot_hwio-dmgABCmgb.gb
-	mismatch at $FF00
-	expected CF
-	got C0
+	passed
 boot_regs-dmgABC.gb
 	passed
 call_cc_timing.gb

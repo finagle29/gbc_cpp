@@ -549,35 +549,30 @@ void clock_m_tick()
 
         z80.clock.long_time++;
 
-        if (!(z80.clock.old_tac & 4) && (z80.clock.tac & 4))
+        z80.clock.tima_reloaded = false;
+        if ((z80.clock.tac & 4) && (!z80.clock.tima))
         {
-                z80.clock.old_tac = z80.clock.tac;
-                if ((((z80.clock.m & 0xf) + (z80.t & 0xf)) & 0x10) == 0x10)
-                {
-                        // time till carry in
-                        // use up this much time
-                        z80.t -= 0x10 - (z80.clock.m & 0xF);
-                        z80.clock.m += 0x10 - (z80.clock.m & 0xF);
-                }
+                z80.clock.tima = z80.clock.tma;
+                z80.int_f |= 4;
+                z80.clock.tima_reloaded = true;
         }
+
         if (z80.clock.tac & 4)
         {
                 // do it 4 times
-                for (unsigned char i = 0; i < 4; i++)
-                {
-                        z80.clock.m++;
+                z80.clock.m += 4;
 
-                        if ((old_m & threshold) && !(z80.clock.m & threshold))
+                if ((old_m & threshold) && !(z80.clock.m & threshold))
+                {
+                        z80.clock.tima++;
+                        if (!z80.clock.tima)
                         {
-                                z80.clock.tima++;
-                                if (!z80.clock.tima)
-                                {
-                                        z80.clock.tima = z80.clock.tma;
-                                        z80.int_f |= 4;
-                                }
+                                // tima should hold 0 for 4 cycles before being reloaded
+                                // z80.clock.tima = z80.clock.tma;
+                                // z80.int_f |= 4;
                         }
-                        old_m = z80.clock.m;
                 }
+                old_m = z80.clock.m;
         }
         else
         {
@@ -647,9 +642,9 @@ void LD_r1_r2_t(unsigned char *r1, unsigned char r2)
 void LD_r1_HL_t(unsigned char *r1)
 {
         PRINT_ASM();
+        gpu_m_tick();
         z = rb_cpu(z80.hl);
         clock_m_tick();
-        gpu_m_tick();
 
         *r1 = z;
         z80.ir = rb_cpu(z80.pc);
@@ -1616,9 +1611,7 @@ void ADD_HL_n_t(const unsigned short *n)
 
 void ADD_SP_n_t()
 {
-        printf("ADD SP e\tDMA: %d\tDMA_ptr: %d\t\n", gpu.do_DMA, gpu.DMA_ptr);
         z_s = rb_cpu(z80.pc);
-        printf("ADD SP %02hhx\n", z_s);
         PRINT_ASM(z_s);
         z80.pc++;
         clock_m_tick();
@@ -1802,6 +1795,7 @@ void HALT_t()
         z80.halt = true;
 
         z80.ir = rb_cpu(z80.pc);
+        z80.pc++;
         gpu_m_tick();
         clock_m_tick();
 }

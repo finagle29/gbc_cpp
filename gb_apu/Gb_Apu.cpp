@@ -265,6 +265,14 @@ int Gb_Apu::read_register(gb_time_t time, gb_addr_t addr)
 	{
 		data |= 0x80;
 	}
+	else if ((addr == 0xFF11) || (addr == 0xFF16))
+	{
+		data |= 0x3F;
+	}
+	else if ((addr == 0xFF14) || (addr == 0xFF19) || (addr == 0xFF1E) || (addr == 0xFF23))
+	{
+		data |= 0xBF;
+	}
 	else if (addr == 0xFF1A)
 	{
 		data |= 0x7F;
@@ -273,13 +281,13 @@ int Gb_Apu::read_register(gb_time_t time, gb_addr_t addr)
 	{
 		data |= 0x9F;
 	}
-	else if ((addr == 0xFF15) || (addr == 0xFF1F) || ((addr > 0xFF26) && (addr < 0xFF30)))
+	else if (
+		(addr == 0xFF13) || (addr == 0xFF15) || (addr == 0xFF18) ||
+		(addr == 0xFF1B) || (addr == 0xFF1D) || (addr == 0xFF1F) ||
+		(addr == 0xFF20) ||
+		((addr > 0xFF26) && (addr < 0xFF30)))
 	{
 		data |= 0xFF;
-	}
-	else if (addr == 0xFF20)
-	{
-		data |= 0xC0;
 	}
 	else if (addr == 0xFF23)
 	{

@@ -174,8 +174,9 @@ void gpu_m_tick()
         if (!GPU_DISP)
         {
                 gpu.mode = 0;
+                gpu.mode_clock = 0;
                 gpu.line = 0;
-                gpu.gpu_stat &= 0xF8;
+                gpu.gpu_stat &= 0xFE;
                 return;
         }
         gpu.mode_clock += 4;
@@ -199,6 +200,16 @@ void gpu_m_tick()
                 {
                         // enter HBlank
                         gpu.mode_clock = 0;
+                        if (
+                            !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                              ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                              ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                              ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                            &&
+                            (gpu.gpu_stat & 0x8))
+                        {
+                                z80_p->int_f |= 0x2;
+                        };
                         gpu.mode = 0;
 
                         // Write a scanline to the framebuffer
@@ -212,17 +223,35 @@ void gpu_m_tick()
                 {
                         gpu.mode_clock = 0;
                         gpu.line++;
-                        gpu.gpu_stat |= ((gpu.line == gpu.lineYC) ? 1 : 0 << 2);
-                        if ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40))
+
+                        if (
+                            !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                              ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                              ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                              ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                            &&
+                            ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40)))
                         {
                                 z80_p->int_f |= 0x2;
-                        }
+                        };
+                        gpu.gpu_stat |= (((gpu.line == gpu.lineYC) ? 1 : 0) << 2);
+
                         if (gpu.line == gpu.wdow_y)
                                 gpu.window_YC = true;
 
-                        if (gpu.line == 143)
+                        if (gpu.line == 144)
                         {
                                 // enter VBlank
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    ((gpu.gpu_stat & 0x10) | (gpu.gpu_stat & 0x20)))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
                                 gpu.mode = 1;
                                 z80.int_f |= 1;
 
@@ -250,6 +279,16 @@ void gpu_m_tick()
                         }
                         else
                         {
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    (gpu.gpu_stat & 0x20))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
                                 gpu.mode = 2;
                         }
                 }
@@ -262,15 +301,31 @@ void gpu_m_tick()
                 {
                         gpu.mode_clock = 0;
                         gpu.line++;
-                        gpu.gpu_stat |= ((gpu.line == gpu.lineYC) ? 1 : 0 << 2);
-                        if ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40))
+                        if (
+                            !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                              ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                              ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                              ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                            &&
+                            ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40)))
                         {
                                 z80_p->int_f |= 0x2;
-                        }
+                        };
+                        gpu.gpu_stat |= (((gpu.line == gpu.lineYC) ? 1 : 0) << 2);
 
                         if (gpu.line > 153)
                         {
                                 // restart scanning mode
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    (gpu.gpu_stat & 0x20))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
                                 gpu.mode = 2;
                                 gpu.line = 0;
                                 gpu.wdow_row = 0;
@@ -280,13 +335,13 @@ void gpu_m_tick()
                 }
                 break;
         }
-        if (((gpu.mode == 0) && (gpu.gpu_stat & 0x8)) ||
-            ((gpu.mode == 2) && (gpu.gpu_stat & 0x20)) ||
-            ((gpu.mode == 1) && (gpu.gpu_stat & 0x30)))
-        {
-                z80_p->int_f |= 0x2;
-        }
-        gpu.gpu_stat = gpu.mode | ((gpu.line == gpu.lineYC) ? 1 : 0 << 2) |
+        // if (((gpu.mode == 0) && (gpu.gpu_stat & 0x8)) ||
+        //     ((gpu.mode == 2) && (gpu.gpu_stat & 0x20)) ||
+        //     ((gpu.mode == 1) && (gpu.gpu_stat & 0x10)))
+        // {
+        //         z80_p->int_f |= 0x2;
+        // }
+        gpu.gpu_stat = gpu.mode | (((gpu.line == gpu.lineYC) ? 1 : 0) << 2) |
                        (gpu.gpu_stat & 0xF8);
 }
 

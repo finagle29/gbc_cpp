@@ -457,6 +457,8 @@ unsigned char rb(unsigned short addr)
                                 case 0xFF00:
                                         return 0xC0 | key.rows[key.column];
                                         // return 0xC0 | key.rows[((key.column & 0x30) >> 4)];
+                                case 0xFF01: // serial
+                                        return 0;
                                 case 0xFF02:
                                         return 0x7E;
                                 case 0xFF04:
@@ -853,10 +855,17 @@ void wb(unsigned short addr, unsigned char val)
                                 z80_p->clock.m = 0;
                                 break;
                         case 0xFF05:
-                                z80_p->clock.tima = val;
+                                if (!z80_p->clock.tima_reloaded)
+                                {
+                                        z80_p->clock.tima = val;
+                                }
                                 break;
                         case 0xFF06:
                                 z80_p->clock.tma = val;
+                                if (z80_p->clock.tima_reloaded)
+                                {
+                                        z80.clock.tima = val;
+                                }
                                 break;
                         case 0xFF07:
                                 z80_p->clock.old_tac = z80_p->clock.tac;
@@ -869,22 +878,22 @@ void wb(unsigned short addr, unsigned char val)
                                 {
                                         printf("tima inc on tac write 1\n");
                                         z80_p->clock.tima++;
-                                        if (!z80_p->clock.tima)
-                                        {
-                                                z80_p->clock.tima = z80_p->clock.tma;
-                                                z80_p->int_f |= 4;
-                                        }
+                                        // if (!z80_p->clock.tima)
+                                        // {
+                                        //         z80_p->clock.tima = z80_p->clock.tma;
+                                        //         z80_p->int_f |= 4;
+                                        // }
                                 }
                                 if ((~z80_p->clock.tac & z80_p->clock.old_tac & 4) &&
                                     (((z80_p->clock.m + z80_p->t - 4) >> old_threshold) & 1))
                                 {
                                         printf("tima inc on tac write 2\n");
                                         z80_p->clock.tima++;
-                                        if (!z80_p->clock.tima)
-                                        {
-                                                z80_p->clock.tima = z80_p->clock.tma;
-                                                z80_p->int_f |= 4;
-                                        }
+                                        // if (!z80_p->clock.tima)
+                                        // {
+                                        //         z80_p->clock.tima = z80_p->clock.tma;
+                                        //         z80_p->int_f |= 4;
+                                        // }
                                 }
                                 // check to see if this results in falling edge, inc TIMA
                                 break;
@@ -892,9 +901,29 @@ void wb(unsigned short addr, unsigned char val)
                                 z80_p->int_f = val;
                                 break;
                         case 0xFF40:
+                                if ((!GPU_DISP) & GET_BIT(val, 7))
+                                {
+                                        if ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40) && !(GET_BIT(gpu.gpu_stat, 2)))
+                                        {
+                                                z80_p->int_f |= 0x2;
+                                        }
+                                        gpu.gpu_stat |= (((gpu.line == gpu.lineYC) ? 1 : 0) << 2);
+                                }
                                 gpu.gpu_ctrl = val;
                                 break;
                         case 0xFF41:
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    (((val & 0x20) && (gpu.mode == 2)) ||
+                                     ((val & 0x10) && (gpu.mode == 1)) ||
+                                     ((val & 0x8) && (gpu.mode == 0))))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
                                 gpu.gpu_stat = val;
                                 break;
                         case 0xFF42:

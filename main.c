@@ -141,6 +141,16 @@ int main(int argc, char *argv[])
 
         z80.ir = rb(z80.pc);
         z80.pc++;
+        for (int i = 0; i < 0x3B; i++)
+        {
+                clock_m_tick();
+        }
+        // z80.clock.m = 0x00E8;
+        gpu_m_tick();
+
+        key.rows[1] = 0xF;
+        key.rows[2] = 0xF;
+        key.column = 1;
 
         SDL_PauseAudioDevice(dev, 0);
 
