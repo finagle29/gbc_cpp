@@ -283,6 +283,11 @@ void wb_cpu(unsigned short addr, unsigned char val)
                                 printf("DMA VRAM bus conflict. Writing 0x%02hhx to 0x%04hx going to DMA instead\n", val, addr);
                                 return;
                         }
+                        else if ((addr & 0xFF00) == 0xFE00)
+                        {
+                                // writing to OAM during DMA does nothing?
+                                return;
+                        }
                         else
                         {
                                 wb(addr, val);

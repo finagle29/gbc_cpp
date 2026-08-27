@@ -14,7 +14,9 @@ mooneye-gb_hwtests/acceptance/timer
 div_write.gb
 	passed
 rapid_toggle.gb
-	passed
+	assertions
+		B: OK
+		C: D9! (D8)
 tim00.gb
 	passed
 tim00_div_trigger.gb
@@ -122,7 +124,9 @@ call_cc_timing2.gb
 	passed
 di_timing-GS.gb
 	passed
-div_timing.gbei_sequence.gb
+div_timing.gb
+	passed
+ei_sequence.gb
 	passed
 ei_timing.gb
 	passed
@@ -168,3 +172,18 @@ reti_timing.gb
 	passed
 rst_timing.gb
 	passed
+
+
+refactoring ideas
+factor out instruction fetch from most instructions, excluding JP HL, JR e
+cpu_tick becomes
+if cb
+	fetch
+execute instr
+if not JP HL or JR E
+	fetch
+
+not sure if the clock ticks should stay in the instruction functions or not
+i think stay in the instruction
+
+this allows LD r, n and LD r, (HL) to be combined into LD r, (HL/PC++) since post-increment will occur before fetch

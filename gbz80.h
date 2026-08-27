@@ -134,7 +134,7 @@ extern gbz80_type *z80_p;
 /* Function prototypes */
 
 /* 8-bit loads */
-void LD_nn_n_t(unsigned char *r);
+void LD_r1_n_t(unsigned char *r1);
 void LD_HL_n_t(void);
 void LD_r1_r2_t(unsigned char *r1, unsigned char r2);
 void LD_r1_HL_t(unsigned char *r1);
