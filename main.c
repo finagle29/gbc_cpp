@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
 
         z80.ir = rb(z80.pc);
         z80.pc++;
-        for (int i = 0; i < 0x3B; i++)
+        for (int i = 0; i < 0x3A; i++)
         {
                 clock_m_tick();
         }

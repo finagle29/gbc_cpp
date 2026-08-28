@@ -134,10 +134,9 @@ extern gbz80_type *z80_p;
 /* Function prototypes */
 
 /* 8-bit loads */
-void LD_r1_n_t(unsigned char *r1);
+void LD_r1_rb_t(unsigned char *r1, unsigned short addr);
 void LD_HL_n_t(void);
 void LD_r1_r2_t(unsigned char *r1, unsigned char r2);
-void LD_r1_HL_t(unsigned char *r1);
 void LD_HL_r2_t(unsigned char r2);
 void LD_A_nn_t(void);
 void LD_A_rp_t(unsigned short n);
@@ -161,29 +160,21 @@ void PUSH_nn_t(const unsigned short *nn);
 void POP_nn_t(unsigned short *nn);
 
 /* 8-bit ALU */
-void ADD_A_n_t(void);
-void ADD_A_HL_t(void);
+void ADD_A_rb_t(unsigned short addr);
 void ADD_A_r_t(unsigned char n);
-void ADC_A_n_t(void);
-void ADC_A_HL_t(void);
+void ADC_A_rb_t(unsigned short addr);
 void ADC_A_r_t(unsigned char n);
-void SUB_A_n_t(void);
-void SUB_A_HL_t(void);
+void SUB_A_rb_t(unsigned short addr);
 void SUB_A_r_t(unsigned char n);
-void SBC_A_n_t(void);
-void SBC_A_HL_t(void);
+void SBC_A_rb_t(unsigned short addr);
 void SBC_A_r_t(unsigned char n);
-void AND_n_t(void);
-void AND_HL_t(void);
+void AND_rb_t(unsigned short addr);
 void AND_r_t(unsigned char n);
-void OR_n_t(void);
-void OR_HL_t(void);
+void OR_rb_t(unsigned short addr);
 void OR_r_t(unsigned char n);
-void XOR_n_t(void);
-void XOR_HL_t(void);
+void XOR_rb_t(unsigned short addr);
 void XOR_r_t(unsigned char n);
-void CP_n_t(void);
-void CP_HL_t(void);
+void CP_rb_t(unsigned short addr);
 void CP_r_t(unsigned char n);
 void INC_n_t(unsigned char *n);
 void INC_HL_t(void);
@@ -268,8 +259,7 @@ static unsigned short *table_rp2[4];
 
 static bool (*table_cc[4])(void);
 static void (*table_alu_r_t[8])(unsigned char);
-static void (*table_alu_n_t[8])(void);
-static void (*table_alu_hl_t[8])(void);
+static void (*table_alu_rb_t[8])(unsigned short);
 static void (*table_rot_t[8])(unsigned char *);
 static void (*table_rot_HL_t[8])(void);
 
