@@ -875,32 +875,32 @@ void wb(unsigned short addr, unsigned char val)
                         case 0xFF07:
                                 z80_p->clock.old_tac = z80_p->clock.tac;
                                 z80_p->clock.tac = val;
+                                // check to see if this results in falling edge, inc TIMA
                                 old_threshold = 3 + (2 * (((z80_p->clock.old_tac & 3) - 1) & 3));
                                 threshold = 3 + (2 * (((z80_p->clock.tac & 3) - 1) & 3));
-                                if ((z80_p->clock.tac & z80_p->clock.old_tac & 4) &&
-                                    (((z80_p->clock.m + z80_p->t - 4) >> old_threshold) & 1) &&
-                                    !(((z80_p->clock.m + z80_p->t - 4) >> threshold) & 1))
+                                // if this TAC write switches from a set bit to an unset bit
+                                if ((z80_p->clock.tac & 4) &&
+                                    (((z80_p->clock.m) >> old_threshold) & 1) &&
+                                    !(((z80_p->clock.m) >> threshold) & 1))
                                 {
                                         printf("tima inc on tac write 1\n");
                                         z80_p->clock.tima++;
-                                        // if (!z80_p->clock.tima)
-                                        // {
-                                        //         z80_p->clock.tima = z80_p->clock.tma;
-                                        //         z80_p->int_f |= 4;
-                                        // }
                                 }
+                                // if this TAC write disables the timer and the previously selected bit is set
                                 if ((~z80_p->clock.tac & z80_p->clock.old_tac & 4) &&
-                                    (((z80_p->clock.m + z80_p->t - 4) >> old_threshold) & 1))
+                                    (((z80_p->clock.m) >> old_threshold) & 1))
                                 {
                                         printf("tima inc on tac write 2\n");
                                         z80_p->clock.tima++;
-                                        // if (!z80_p->clock.tima)
-                                        // {
-                                        //         z80_p->clock.tima = z80_p->clock.tma;
-                                        //         z80_p->int_f |= 4;
-                                        // }
                                 }
-                                // check to see if this results in falling edge, inc TIMA
+                                // if this TAC write enables the timer and it experienced a falling edge
+                                if ((z80_p->clock.tac & ~z80_p->clock.old_tac & 4) &&
+                                    (((z80_p->clock.m - 4) >> old_threshold) & 1) &&
+                                    !(((z80_p->clock.m) >> old_threshold) & 1))
+                                {
+                                        printf("tima inc on tac write 3\n");
+                                        z80_p->clock.tima++;
+                                }
                                 break;
                         case 0xFF0F:
                                 z80_p->int_f = val;

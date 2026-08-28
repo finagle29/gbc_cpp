@@ -14,9 +14,7 @@ mooneye-gb_hwtests/acceptance/timer
 div_write.gb
 	passed
 rapid_toggle.gb
-	assertions
-		B: OK
-		C: D9! (D8)
+	passed
 tim00.gb
 	passed
 tim00_div_trigger.gb

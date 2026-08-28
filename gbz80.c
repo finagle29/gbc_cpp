@@ -12,8 +12,6 @@ gbz80_type z80 = {
                .hl = 0,
                .sp = 0,
                .pc = 0,
-               .m = 0,
-               .t = 0,
                .halt = false,
                .stop = false,
                .ime = false,
@@ -60,9 +58,6 @@ void reset()
         z80.hl = 0;
         z80.sp = 0;
         z80.pc = 0;
-
-        z80.m = 0;
-        z80.t = 0;
 
         // z80.clock.m = 0; z80.clock.t = 0;
         z80.stop = z80.halt = false;
@@ -515,8 +510,6 @@ int cpu_tick()
                 {
                         RST_IRQ_n_t(0x00);
                 }
-                // z80.clock.m += z80.m;
-                // z80.clock.t += z80.t;
         }
 
         if (z80.new_ime)
@@ -540,10 +533,11 @@ void clock_m_tick()
                 z80.clock.tima_reloaded = true;
         }
 
+        z80.clock.m += 4;
+
         if (z80.clock.tac & 4)
         {
                 // do it 4 times
-                z80.clock.m += 4;
 
                 if ((old_m & threshold) && !(z80.clock.m & threshold))
                 {
@@ -557,10 +551,7 @@ void clock_m_tick()
                 }
                 old_m = z80.clock.m;
         }
-        else
-        {
-                z80.clock.m += 4;
-        }
+
         mmu->rtc.m_cycles++;
         if ((mmu->rtc.m_cycles >= 32) && (!mmu->rtc.halt_flag))
         {

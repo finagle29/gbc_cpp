@@ -118,8 +118,6 @@ typedef struct
 
                 unsigned short sp;
                 unsigned short pc;
-                unsigned char m;
-                unsigned char t;
                 unsigned char ir;
         }; // 15 bytes
 
