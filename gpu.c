@@ -622,7 +622,7 @@ void setup(bool tileset, bool bgmap)
                 framebuffer_bgmap = SDL_CreateTexture(bg_r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 256, 256);
         }
 
-        for (i = 0; i < 1000; i++)
+        for (i = 0; i < 100; i++)
         {
                 SDL_Delay(1);
                 SDL_PumpEvents();
