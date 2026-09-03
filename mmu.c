@@ -844,7 +844,6 @@ void wb(unsigned short addr, unsigned char val)
                                 threshold = 3 + (2 * (((z80_p->clock.tac & 3) - 1) & 3));
                                 printf("writing to DIV\n");
                                 printf("enter div register: 0x%04X\n", z80_p->clock.m);
-                                printf("t time: %d\n", z80_p->t);
                                 printf("threshold: 0x%04X\n", 1 << threshold);
 
                                 if ((z80_p->clock.tac & 4) && (((z80_p->clock.m /*+ z80_p->t */) >> threshold) & 1))
