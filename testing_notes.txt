@@ -81,14 +81,14 @@ intr_2_0_timing.gb
 intr_2_mode0_timing.gb
 	passed
 intr_2_mode0_timing_sprites.gb
-	test #00 failed
+	test #02 failed
 intr_2_mode3_timing.gb
 	passed
 intr_2_oam_ok_timing.gb
 	passed
 lcdon_timing-GS.gb
 	test failed: LY
-	cycle: $3C
+	cycle: $6E
 	expected: $00
 	actual: $01
 lcdon_write_timing-GS.gb

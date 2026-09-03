@@ -139,7 +139,456 @@ void scan_oam()
         gpu.num_sprites = i;
 }
 
+void fetcher_tick()
+{
+        // state machine
+        unsigned short mapoffs, lineoffs;
+        unsigned char tile_line;
+        unsigned char x, y, sprite_num, sprite_flags, i;
+        if (gpu.fetcher.window)
+        {
+                mapoffs = GPU_WDOW_MAP ? 0x1C00 : 0x1800;
+                lineoffs = gpu.fetcher.x & 0x1F;
+                lineoffs += (((gpu.wdow_row) & 0xF8) << 2);
+                tile_line = (gpu.wdow_row) & 0x7;
+        }
+        else
+        {
+                mapoffs = GPU_BG_MAP ? 0x1C00 : 0x1800;
+                lineoffs = ((gpu.scrollX >> 3) + gpu.fetcher.x) & 0x1F;
+                lineoffs += (((gpu.line + gpu.scrollY) & 0xF8) << 2);
+                tile_line = ((gpu.line + gpu.scrollY) & 0x7);
+        }
+        if (gpu.fetcher.sprite)
+        {
+                i = gpu.sprites[gpu.sprite_ix];
+
+                y = gpu.oam[4 * i] - 16;
+                x = gpu.oam[4 * i + 1] - 8;
+                gpu.fetcher.tile = gpu.oam[4 * i + 2];
+                sprite_flags = gpu.oam[4 * i + 3];
+
+                if (GET_BIT(sprite_flags, 6))
+                {
+                        tile_line = 7 - (gpu.line - y) + 8 * GPU_SP_SZ;
+                }
+                else
+                {
+                        tile_line = (gpu.line - y);
+                }
+                if (GPU_SP_SZ)
+                        gpu.fetcher.tile &= 0xFE;
+
+                unsigned char pal;
+
+                if (GET_BIT(sprite_flags, 4))
+                {
+                        pal = gpu.ob_pal1;
+                }
+                else
+                {
+                        pal = gpu.ob_pal0;
+                }
+        }
+
+        switch (gpu.fetcher.mode)
+        {
+        // get tile
+        case 0:
+                lineoffs &= 0x3FF;
+                if (gpu.fetcher.sprite)
+                {
+                        i = gpu.sprites[gpu.sprite_ix];
+                        gpu.fetcher.tile = gpu.oam[4 * i + 2];
+                        if (GPU_SP_SZ)
+                                gpu.fetcher.tile &= 0xFE;
+                }
+                else
+                {
+                        gpu.fetcher.tile = gpu.vram[mapoffs + lineoffs];
+                }
+                gpu.fetcher.mode++;
+                break;
+        case 1:
+                gpu.fetcher.mode++;
+                break;
+        case 2:
+                if (GPU_BG_SET || gpu.fetcher.sprite)
+                        gpu.fetcher.tile_lo = gpu.vram[2 * tile_line + 16 * gpu.fetcher.tile];
+                else
+                        gpu.fetcher.tile_lo = gpu.vram[0x1000 + 2 * tile_line + 16 * (signed char)gpu.fetcher.tile];
+                gpu.fetcher.mode++;
+                break;
+        case 3:
+                gpu.fetcher.mode++;
+                break;
+        case 4:
+                if (GPU_BG_SET || gpu.fetcher.sprite)
+                        gpu.fetcher.tile_hi = gpu.vram[1 + 2 * tile_line + 16 * gpu.fetcher.tile];
+                else
+                        gpu.fetcher.tile_hi = gpu.vram[0x1000 + 1 + 2 * tile_line + 16 * (signed char)gpu.fetcher.tile];
+                gpu.fetcher.mode++;
+                break;
+        case 5:
+                // if first time on scanline
+                gpu.fetcher.mode++;
+                if (gpu.fetcher.starting)
+                {
+                        gpu.fetcher.mode = 0;
+                        gpu.fetcher.starting = false;
+                }
+                break;
+        case 6:
+        case 7:
+                gpu.fetcher.mode++;
+                if (gpu.fetcher.sprite)
+                {
+                        unsigned char fifo_ix;
+                        for (unsigned char i = 0; i < 8; i++)
+                        {
+                                fifo_ix = (gpu.sprite_FIFO.start + i) % 16;
+                                if (GET_BIT(sprite_flags, 5))
+                                {
+                                        if (gpu.sprite_FIFO.FIFO[fifo_ix].color == 0)
+                                        {
+                                                gpu.sprite_FIFO.FIFO[fifo_ix] = (FIFO_item_t){
+                                                    .sprite_priority = 0,
+                                                    .palette = 8 + 8 * GET_BIT(sprite_flags, 4),
+                                                    .bg_priority = GET_BIT(sprite_flags, 7),
+                                                    .color = (2 * ((gpu.fetcher.tile_hi >> i) & 1) +
+                                                              ((gpu.fetcher.tile_lo >> i) & 1))};
+                                        }
+                                }
+                                else
+                                {
+                                        if (gpu.sprite_FIFO.FIFO[fifo_ix].color == 0)
+                                        {
+                                                gpu.sprite_FIFO.FIFO[fifo_ix] = (FIFO_item_t){
+                                                    .sprite_priority = 0,
+                                                    .palette = 8 + 8 * GET_BIT(sprite_flags, 4),
+                                                    .bg_priority = GET_BIT(sprite_flags, 7),
+                                                    .color = (2 * ((gpu.fetcher.tile_hi >> (7 - i)) & 1) +
+                                                              ((gpu.fetcher.tile_lo >> (7 - i)) & 1))};
+                                        }
+                                }
+                        }
+                        gpu.sprite_FIFO.size = 8;
+                        gpu.sprite_FIFO.end = fifo_ix;
+                        gpu.fetcher.sprite = false;
+                        gpu.sprite_ix++;
+                        gpu.fetcher.mode = 0;
+                }
+                else if (gpu.bg_FIFO.size == 0)
+                {
+                        // fill it with pixels
+                        for (unsigned char i = 0; i < 8; i++)
+                        {
+                                if (GPU_BG)
+                                {
+                                        FIFO_push(&gpu.bg_FIFO,
+                                                  (FIFO_item_t){
+                                                      .bg_priority = false,
+                                                      .palette = 8, // here 8 means DMG
+                                                      .sprite_priority = 0,
+                                                      .color = (2 * ((gpu.fetcher.tile_hi >> (7 - i)) & 1) +
+                                                                ((gpu.fetcher.tile_lo >> (7 - i)) & 1))});
+                                }
+                                else
+                                {
+                                        FIFO_push(&gpu.bg_FIFO,
+                                                  (FIFO_item_t){
+                                                      .bg_priority = false,
+                                                      .palette = 8, // here 8 means DMG
+                                                      .sprite_priority = 0,
+                                                      .color = 0});
+                                }
+                        }
+                        // printf("pushed tile %04hx to FIFO %02hhx %02hhx\n", gpu.fetcher.tile, gpu.fetcher.tile_hi, gpu.fetcher.tile_lo);
+                        gpu.fetcher.mode = 0;
+                        gpu.fetcher.x++;
+                }
+                break;
+        }
+}
+
+bool gpu_t_tick()
+{
+        // try to push one pixel to LCD
+
+        // if we're at the beginning of the scanline
+        if (gpu.x == 0)
+        {
+                // and bg FIFO is not empty
+                if (gpu.bg_FIFO.size)
+                {
+                        // and we need to toss more pixels
+                        if ((gpu.scrollX & 7) > gpu.trashed_pixels)
+                        {
+                                FIFO_pop(&gpu.bg_FIFO);
+                                gpu.trashed_pixels++;
+                                return false;
+                        }
+                }
+        }
+        if (gpu.x == 160)
+        {
+                return true;
+        }
+
+        if (gpu.bg_FIFO.size && !gpu.fetcher.sprite)
+        {
+                FIFO_item_t bg_pixel = FIFO_pop(&gpu.bg_FIFO);
+
+                if (gpu.sprite_FIFO.size)
+                {
+                        FIFO_item_t sp_pixel = FIFO_pop(&gpu.sprite_FIFO);
+                        // sprite is not transparent and sprites enabled
+                        if ((sp_pixel.color && GPU_SPR) && ((sp_pixel.bg_priority && (bg_pixel.color == 0)) || !sp_pixel.bg_priority))
+                        {
+                                // sprite has BG over OBJ priority bit set and BG is transparent
+                                // or BG over OBJ is unset
+                                if (sp_pixel.palette == 8)
+                                        pixels[gpu.x + (gpu.line * 160)] = PAL[3 & (gpu.ob_pal0 >> (sp_pixel.color * 2))];
+                                else if (sp_pixel.palette == 16)
+                                        pixels[gpu.x + (gpu.line * 160)] = PAL[3 & (gpu.ob_pal1 >> (sp_pixel.color * 2))];
+                        }
+                        else
+                        {
+                                if (bg_pixel.palette == 8)
+                                        pixels[gpu.x + (gpu.line) * 160] = PAL[(gpu.bg_pal >> (bg_pixel.color * 2)) & 3];
+                        }
+                }
+                else
+                {
+                        if (bg_pixel.palette == 8)
+                                pixels[gpu.x + (gpu.line) * 160] = PAL[(gpu.bg_pal >> (bg_pixel.color * 2)) & 3];
+                }
+                gpu.x++;
+                // check for window start
+        }
+        if (!gpu.fetcher.window)
+        {
+                if (GPU_WDOW && (gpu.wdow_y <= gpu.line) && (gpu.x >= gpu.wdow_x - 7))
+                {
+                        // window time
+                        gpu.fetcher.mode = 0;
+                        gpu.fetcher.x = 0;
+                        gpu.fetcher.window = true;
+                        gpu.wdow_row++;
+                }
+        }
+        if (GPU_SPR && !gpu.fetcher.sprite && (gpu.sprite_ix < gpu.num_sprites) && (gpu.oam[gpu.sprites[gpu.sprite_ix] * 4 + 1] <= gpu.x + 8))
+        {
+                // fetch sprite
+                gpu.fetcher.sprite = true;
+                gpu.fetcher.mode = 0;
+        }
+        fetcher_tick();
+        return false;
+}
+
 void gpu_m_tick()
+{
+        if (gpu.do_DMA)
+        {
+                if (gpu.DMA >= 0xE0)
+                {
+                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)((gpu.DMA - 0x20) << 8) + gpu.DMA_ptr);
+                }
+                else
+                {
+                        gpu.oam[gpu.DMA_ptr] = rb((unsigned short)(gpu.DMA << 8) + gpu.DMA_ptr);
+                }
+                gpu.DMA_ptr++;
+                if (gpu.DMA_ptr >= 0xA0)
+                {
+                        gpu.do_DMA = false;
+                        gpu.DMA_ptr = 0;
+                }
+        }
+        if (gpu.reset_DMA)
+        {
+                gpu.do_DMA = true;
+                gpu.reset_DMA = false;
+                gpu.DMA_ptr = 0;
+        }
+        if (gpu.DMA_requested)
+        {
+                gpu.reset_DMA = true;
+                gpu.DMA_requested = false;
+                // no-op the first cycle
+        }
+
+        if (!GPU_DISP)
+        {
+                gpu.mode = 0;
+                gpu.mode_clock = 0;
+                gpu.line = 0;
+                gpu.gpu_stat &= 0xFE;
+                return;
+        }
+
+        gpu.mode_clock += 4;
+        switch (gpu.mode)
+        {
+        // OAM read mode, scanline is active
+        case 2:
+                if (gpu.mode_clock >= 80)
+                {
+                        scan_oam();
+                        gpu.mode_clock = 0;
+                        gpu.mode = 3;
+                        gpu.sprite_ix = 0;
+                        gpu.x = 0;
+                        gpu.fetcher.starting = true;
+                        gpu.fetcher.window = false;
+                        gpu.fetcher.x = 0;
+                        gpu.fetcher.mode = 0;
+                        gpu.bg_FIFO.start = 0;
+                        gpu.bg_FIFO.end = 0;
+                        gpu.bg_FIFO.size = 0;
+                        gpu.trashed_pixels = 0;
+                }
+                break;
+        case 3:
+                gpu_t_tick() || gpu_t_tick() || gpu_t_tick() || gpu_t_tick();
+
+                if (gpu.x >= 160)
+                {
+                        // enter HBlank
+                        if (
+                            !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                              ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                              ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                              ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                            &&
+                            (gpu.gpu_stat & 0x8))
+                        {
+                                z80_p->int_f |= 0x2;
+                                // gpu.timer = 0;
+                        };
+                        gpu.mode = 0;
+                }
+                break;
+
+        // HBlank. after the last one push the screen data
+        case 0:
+                if (gpu.mode_clock >= 376)
+                {
+                        gpu.mode_clock = 0;
+                        gpu.line++;
+
+                        if (
+                            !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                              ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                              ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                              ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                            &&
+                            ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40)))
+                        {
+                                z80_p->int_f |= 0x2;
+                        };
+                        gpu.gpu_stat |= (((gpu.line == gpu.lineYC) ? 1 : 0) << 2);
+
+                        if (gpu.line == gpu.wdow_y)
+                                gpu.window_YC = true;
+
+                        if (gpu.line == 144)
+                        {
+                                // enter VBlank
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    ((gpu.gpu_stat & 0x10) | (gpu.gpu_stat & 0x20)))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
+                                gpu.mode = 1;
+                                z80.int_f |= 1;
+
+                                for (int i = 0; i < 160 * 144; i++)
+                                {
+                                        tmp[i] = (pixels[i] / 2 + prev_pixels[i] / 2);
+                                        prev_pixels[i] = pixels[i];
+                                        tmp[i] = pixels[i];
+                                }
+
+                                SDL_UpdateTexture(framebuffer, NULL, tmp, 160 * sizeof(unsigned int));
+                                SDL_RenderCopy(renderer, framebuffer, NULL, NULL);
+                                SDL_RenderPresent(renderer);
+
+                                // framerate calculations go here
+                                if (show_tileset)
+                                        showTileSet();
+                                if (show_bgmap)
+                                        showBGMap();
+                        }
+                        else
+                        {
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    (gpu.gpu_stat & 0x20))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
+                                gpu.mode = 2;
+                        }
+                }
+                break;
+
+        // VBlank
+        case 1:
+                gpu.window_YC = false;
+                if (gpu.mode_clock >= 456)
+                {
+                        gpu.mode_clock = 0;
+                        gpu.line++;
+                        if (
+                            !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                              ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                              ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                              ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                            &&
+                            ((gpu.line == gpu.lineYC) && (gpu.gpu_stat & 0x40)))
+                        {
+                                z80_p->int_f |= 0x2;
+                        };
+                        gpu.gpu_stat |= (((gpu.line == gpu.lineYC) ? 1 : 0) << 2);
+
+                        if (gpu.line > 153)
+                        {
+                                // restart scanning mode
+                                if (
+                                    !(((gpu.gpu_stat & 0x40) && (gpu.gpu_stat & 0x4)) |
+                                      ((gpu.gpu_stat & 0x20) && (gpu.mode == 2)) |
+                                      ((gpu.gpu_stat & 0x10) && (gpu.mode == 1)) |
+                                      ((gpu.gpu_stat & 0x8) && (gpu.mode == 0))) // GPU STAT line is low
+                                    &&
+                                    (gpu.gpu_stat & 0x20))
+                                {
+                                        z80_p->int_f |= 0x2;
+                                };
+                                gpu.mode = 2;
+                                gpu.line = 0;
+                                gpu.wdow_row = -1;
+                                if (gpu.line == gpu.wdow_y)
+                                        gpu.window_YC = true;
+                        }
+                }
+                break;
+        }
+        gpu.gpu_stat = gpu.mode | (((gpu.line == gpu.lineYC) ? 1 : 0) << 2) |
+                       (gpu.gpu_stat & 0xF8);
+}
+
+void gpu_m_tick_old()
 {
         if (gpu.do_DMA)
         {
@@ -642,4 +1091,20 @@ void cleanup()
         SDL_DestroyTexture(framebuffer_bgmap);
         SDL_DestroyTexture(framebuffer_tileset);
         SDL_Quit();
+}
+
+FIFO_item_t FIFO_pop(FIFO_t *fifo)
+{
+        FIFO_item_t item = fifo->FIFO[fifo->start];
+        fifo->FIFO[fifo->start] = (FIFO_item_t){.color = 0};
+        fifo->start = (fifo->start + 1) % 16;
+        fifo->size--;
+        return item;
+}
+
+void FIFO_push(FIFO_t *fifo, FIFO_item_t item)
+{
+        fifo->FIFO[fifo->end] = item;
+        fifo->end = (fifo->end + 1) % 16;
+        fifo->size++;
 }

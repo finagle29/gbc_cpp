@@ -298,6 +298,8 @@ void INThandler(int sig)
                 f = fopen("oam_dump.bin", "wb");
                 fwrite(gpu.oam, 1, 0xA0, f);
                 fclose(f);
+
+                dump_vram();
                 cleanup();
 
                 exit(0);
